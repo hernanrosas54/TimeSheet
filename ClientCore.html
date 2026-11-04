@@ -1,0 +1,503 @@
+<script>
+/**
+ * Núcleo del front-end: estado global, llamadas al servidor,
+ * utilidades de formato, avisos (toasts), pestañas y combobox reutilizable.
+ */
+const Core = (function () {
+  const state = {
+    app: {},
+    identity: null,
+    user: null,
+    projects: [],
+    clients: [],
+    activityTypes: [],
+    users: [],
+    defaults: {},
+    schemas: {},
+    page: 'time'
+  };
+
+  const $ = (selector, root) => (root || document).querySelector(selector);
+  const $$ = (selector, root) => Array.prototype.slice.call((root || document).querySelectorAll(selector));
+
+  /* ------------------------------------------------------------ Servidor */
+  function call(name) {
+    const args = Array.prototype.slice.call(arguments, 1);
+    return new Promise((resolve, reject) => {
+      const runner = google.script.run
+        .withSuccessHandler((response) => {
+          if (response && response.ok) {
+            resolve(response.data);
+          } else {
+            reject(new Error((response && response.error) || 'Error inesperado del servidor.'));
+          }
+        })
+        .withFailureHandler((error) => {
+          reject(new Error((error && error.message) || 'No se pudo conectar con el servidor.'));
+        });
+
+      runner[name].apply(runner, args);
+    });
+  }
+
+  /* ------------------------------------------------------------ Formato */
+  function pad2(num) {
+    return (Number(num) < 10 ? '0' : '') + Number(num);
+  }
+
+  function formatMinutes(minutes) {
+    const total = Math.round(Number(minutes) || 0);
+    if (!total) return '0 min';
+    const hours = Math.floor(total / 60);
+    const mins = total % 60;
+    if (!hours) return mins + ' min';
+    if (!mins) return hours + ' h';
+    return hours + ' h ' + pad2(mins) + ' min';
+  }
+
+  function formatDateEs(iso) {
+    const text = String(iso || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return text || '—';
+    const parts = text.split('-');
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
+  }
+
+  function weekdayName(iso) {
+    const text = String(iso || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return '';
+    const parts = text.split('-');
+    const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    return ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][date.getDay()];
+  }
+
+  function formatDateLong(iso) {
+    const name = weekdayName(iso);
+    return (name ? name + ' ' : '') + formatDateEs(iso);
+  }
+
+  function todayIso() {
+    const now = new Date();
+    return now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate());
+  }
+
+  function timeToMinutes(value) {
+    const parts = String(value || '').split(':');
+    return (Number(parts[0]) || 0) * 60 + (Number(parts[1]) || 0);
+  }
+
+  function minutesToTime(minutes) {
+    const total = ((Math.round(Number(minutes) || 0) % 1440) + 1440) % 1440;
+    return pad2(Math.floor(total / 60)) + ':' + pad2(total % 60);
+  }
+
+  function roundToStep(value, step) {
+    if (!/^\d{2}:\d{2}$/.test(String(value || ''))) return '';
+    const size = Number(step) || 10;
+    let minutes = Math.round(timeToMinutes(value) / size) * size;
+    if (minutes >= 1440) minutes = 1440 - size;
+    return minutesToTime(minutes);
+  }
+
+  function currentRoundedTime(step) {
+    const now = new Date();
+    return roundToStep(pad2(now.getHours()) + ':' + pad2(now.getMinutes()), step);
+  }
+
+  function normalize(value) {
+    return String(value == null ? '' : value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /* ------------------------------------------------------------ Avisos */
+  function toast(message, type, timeout) {
+    const host = document.getElementById('toasts');
+    if (!host) return;
+    const item = document.createElement('div');
+    item.className = 'toast toast-' + (type || 'info');
+    item.setAttribute('role', 'status');
+    const icon = type === 'error' ? '⚠' : (type === 'success' ? '✓' : 'ℹ');
+    item.innerHTML = '<span class="text-base leading-none">' + icon + '</span>' +
+      '<span class="flex-1 whitespace-pre-line">' + escapeHtml(message) + '</span>';
+    host.appendChild(item);
+    const life = Number(timeout) || (type === 'error' ? 7000 : 3500);
+    setTimeout(() => {
+      item.style.transition = 'opacity .2s ease, transform .2s ease';
+      item.style.opacity = '0';
+      item.style.transform = 'translateY(6px)';
+      setTimeout(() => item.remove(), 220);
+    }, life);
+  }
+
+  /* ------------------------------------------------------------ Pestañas */
+  const PAGES = [
+    { id: 'time', label: 'Registrar tiempo' },
+    { id: 'entries', label: 'Registros' },
+    { id: 'table:Proyectos', label: 'Proyectos' },
+    { id: 'table:Clientes', label: 'Clientes' },
+    { id: 'table:Usuarios', label: 'Usuarios' },
+    { id: 'table:TiposActividad', label: 'Tipos de actividad' }
+  ];
+
+  function renderTabs() {
+    const host = document.getElementById('tabs');
+    if (!host) return;
+    host.innerHTML = PAGES.map((page) => {
+      const active = page.id === state.page ? ' is-active' : '';
+      return '<button type="button" class="tab' + active + '" data-page="' + page.id + '">' +
+        escapeHtml(page.label) + '</button>';
+    }).join('');
+
+    $$('.tab', host).forEach((button) => {
+      button.addEventListener('click', () => navigate(button.dataset.page));
+    });
+  }
+
+  const PAGE_SECTIONS = {
+    identity: 'page-identity',
+    time: 'page-time',
+    entries: 'page-entries',
+    table: 'page-table'
+  };
+
+  function showSection(name) {
+    Object.keys(PAGE_SECTIONS).forEach((key) => {
+      const section = document.getElementById(PAGE_SECTIONS[key]);
+      if (section) section.classList.toggle('hidden', key !== name);
+    });
+  }
+
+  /** Navega a una página: time, entries, table:<NombreTabla> o identity. */
+  function navigate(target) {
+    const page = target || 'time';
+
+    if (!state.user) {
+      state.page = 'identity';
+      renderTabs();
+      showSection('identity');
+      return;
+    }
+
+    state.page = page;
+    renderTabs();
+
+    if (page === 'time') {
+      showSection('time');
+      if (window.TimePage) TimePage.refresh();
+      return;
+    }
+
+    if (page === 'entries') {
+      showSection('entries');
+      if (window.TablesPage) TablesPage.showEntries();
+      return;
+    }
+
+    if (page.indexOf('table:') === 0) {
+      showSection('table');
+      if (window.TablesPage) TablesPage.showTable(page.slice('table:'.length));
+      return;
+    }
+
+    showSection('time');
+  }
+
+
+  /* ------------------------------------------------------------ Combobox */
+  /**
+   * Autocompletado accesible sobre un input + ul.
+   * items: [{ value, label, search, meta, disabled }]
+   */
+  function createCombobox(options) {
+    const input = options.input;
+    const list = options.list;
+    const emptyText = options.emptyText || 'Sin coincidencias';
+    const maxItems = options.maxItems || 60;
+
+    let items = [];
+    let filtered = [];
+    let activeIndex = -1;
+    let selected = null;
+    let isOpen = false;
+
+    function highlight() {
+      $$('.combo-item', list).forEach((element, index) => {
+        element.classList.toggle('is-active', index === activeIndex);
+      });
+    }
+
+    function render() {
+      if (!filtered.length) {
+        list.innerHTML = '<li class="combo-empty">' + escapeHtml(emptyText) + '</li>';
+      } else {
+        list.innerHTML = filtered.map((item, index) => {
+          const meta = item.meta ? '<span class="combo-meta">' + escapeHtml(item.meta) + '</span>' : '';
+          const style = item.disabled ? ' style="opacity:.55"' : '';
+          return '<li class="combo-item" role="option" data-index="' + index + '"' + style + '>' +
+            '<span class="truncate">' + escapeHtml(item.label) + '</span>' + meta + '</li>';
+        }).join('');
+      }
+      highlight();
+    }
+
+    function open() {
+      if (isOpen) return;
+      isOpen = true;
+      list.classList.remove('hidden');
+      input.setAttribute('aria-expanded', 'true');
+    }
+
+    function close() {
+      if (!isOpen) return;
+      isOpen = false;
+      list.classList.add('hidden');
+      input.setAttribute('aria-expanded', 'false');
+      activeIndex = -1;
+    }
+
+    function filter() {
+      const query = normalize(input.value);
+      filtered = items.filter((item) => {
+        if (!query) return true;
+        return normalize(item.search || item.label).indexOf(query) !== -1;
+      }).slice(0, maxItems);
+      activeIndex = filtered.length ? 0 : -1;
+    }
+
+    function refresh() {
+      filter();
+      render();
+    }
+
+    function choose(index) {
+      const item = filtered[index];
+      if (!item || item.disabled) return;
+      selected = item;
+      input.value = item.label;
+      close();
+      input.classList.remove('is-invalid');
+      if (options.onSelect) options.onSelect(item);
+    }
+
+    function setItems(nextItems) {
+      items = nextItems || [];
+      if (input.value) refresh();
+    }
+
+    function setSelectedByValue(value) {
+      const key = normalize(value);
+      const found = items.filter((item) => {
+        return normalize(item.value) === key || normalize(item.label) === key;
+      })[0] || null;
+      selected = found;
+      if (found) {
+        input.value = found.label;
+        if (options.onSelect) options.onSelect(found);
+      }
+      return found;
+    }
+
+    /** Devuelve la opción seleccionada; si el texto coincide con una, la adopta. */
+    function resolve() {
+      if (selected && normalize(input.value) === normalize(selected.label)) return selected;
+      const key = normalize(input.value);
+      if (!key) return null;
+      const exact = items.filter((item) => {
+        return normalize(item.value) === key ||
+          normalize(item.label) === key ||
+          normalize((item.value || '') + ' ' + (item.label || '')) === key;
+      })[0];
+      if (exact) {
+        selected = exact;
+        input.value = exact.label;
+        return exact;
+      }
+      return null;
+    }
+
+    function clear() {
+      selected = null;
+      input.value = '';
+      close();
+    }
+
+    input.addEventListener('focus', () => {
+      filter();
+      render();
+      open();
+    });
+
+    input.addEventListener('input', () => {
+      selected = null;
+      if (options.onClear) options.onClear();
+      refresh();
+      open();
+    });
+
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        if (!isOpen) {
+          refresh();
+          open();
+        }
+        activeIndex = Math.min(activeIndex + 1, filtered.length - 1);
+        highlight();
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        activeIndex = Math.max(activeIndex - 1, 0);
+        highlight();
+      } else if (event.key === 'Enter') {
+        if (isOpen && filtered.length && activeIndex >= 0) {
+          event.preventDefault();
+          choose(activeIndex);
+        } else {
+          close();
+        }
+      } else if (event.key === 'Escape') {
+        close();
+      } else if (event.key === 'Tab') {
+        close();
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      setTimeout(close, 160);
+    });
+
+    list.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+    });
+
+    list.addEventListener('click', (event) => {
+      const item = event.target.closest('[data-index]');
+      if (!item) return;
+      choose(Number(item.dataset.index));
+    });
+
+    return {
+      setItems: setItems,
+      refresh: refresh,
+      resolve: resolve,
+      clear: clear,
+      close: close,
+      getSelected: () => selected,
+      setSelectedByValue: setSelectedByValue
+    };
+  }
+
+
+  /* ------------------------------------------------------------ Diálogos */
+  let modalOnClose = null;
+
+  function onModalKey(event) {
+    if (event.key === 'Escape') closeModal();
+  }
+
+  function openModal(html, onClose) {
+    const root = document.getElementById('modalRoot');
+    modalOnClose = typeof onClose === 'function' ? onClose : null;
+    root.innerHTML = '<div class="modal-backdrop"><div class="modal-panel fade-in">' + html + '</div></div>';
+    const backdrop = root.firstElementChild;
+    backdrop.addEventListener('click', (event) => {
+      if (event.target === backdrop) closeModal();
+    });
+    document.addEventListener('keydown', onModalKey);
+    const panel = root.querySelector('.modal-panel');
+    const firstField = panel.querySelector('input, select, textarea');
+    if (firstField) setTimeout(() => firstField.focus(), 60);
+    return panel;
+  }
+
+  function closeModal() {
+    const root = document.getElementById('modalRoot');
+    if (root) root.innerHTML = '';
+    document.removeEventListener('keydown', onModalKey);
+    const callback = modalOnClose;
+    modalOnClose = null;
+    if (callback) callback();
+  }
+
+  /** Confirmación simple. Devuelve una promesa<boolean>. */
+  function confirmDialog(title, message, confirmLabel) {
+    return new Promise((resolve) => {
+      const panel = openModal(
+        '<div class="p-6">' +
+          '<h3 class="text-base font-semibold text-slate-900">' + escapeHtml(title) + '</h3>' +
+          '<p class="mt-2 text-sm text-slate-600">' + escapeHtml(message) + '</p>' +
+          '<div class="mt-5 flex justify-end gap-2">' +
+            '<button type="button" class="btn btn-ghost" data-action="cancel">Cancelar</button>' +
+            '<button type="button" class="btn btn-danger" data-action="ok">' +
+              escapeHtml(confirmLabel || 'Eliminar') + '</button>' +
+          '</div>' +
+        '</div>',
+        () => resolve(false)
+      );
+
+      panel.querySelector('[data-action="cancel"]').addEventListener('click', () => {
+        resolve(false);
+        closeModal();
+      });
+      panel.querySelector('[data-action="ok"]').addEventListener('click', () => {
+        resolve(true);
+        closeModal();
+      });
+    });
+  }
+
+  /** Activa/desactiva un botón mostrando un texto de progreso. */
+  function setBusy(button, busy, busyLabel) {
+    if (!button) return;
+    if (busy) {
+      button.dataset.originalLabel = button.textContent;
+      button.disabled = true;
+      button.textContent = busyLabel || 'Guardando…';
+    } else {
+      button.disabled = false;
+      if (button.dataset.originalLabel) button.textContent = button.dataset.originalLabel;
+    }
+  }
+
+  /* ------------------------------------------------------------ Exportación */
+  return {
+    state: state,
+    $: $,
+    $$: $$,
+    call: call,
+    toast: toast,
+    escapeHtml: escapeHtml,
+    normalize: normalize,
+    formatMinutes: formatMinutes,
+    formatDateEs: formatDateEs,
+    formatDateLong: formatDateLong,
+    weekdayName: weekdayName,
+    todayIso: todayIso,
+    timeToMinutes: timeToMinutes,
+    minutesToTime: minutesToTime,
+    roundToStep: roundToStep,
+    currentRoundedTime: currentRoundedTime,
+    renderTabs: renderTabs,
+    navigate: navigate,
+    showSection: showSection,
+    createCombobox: createCombobox,
+    openModal: openModal,
+    closeModal: closeModal,
+    confirmDialog: confirmDialog,
+    setBusy: setBusy,
+    pages: PAGES
+  };
+})();
+</script>
+

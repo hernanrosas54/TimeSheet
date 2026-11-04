@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title><?= appTitle ?></title>
+  <!--
+    Favicon propio (reloj de arena sobre cuadrado slate), embebido como data URI:
+    los proyectos de Apps Script no pueden servir archivos estáticos, así que
+    se usa el SVG (navegadores modernos) con un PNG de 32x32 como respaldo.
+    Fuente editable: assets/favicon.svg (no se publica al proyecto).
+  -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJDb250cm9sIGRlIFRpZW1wbyI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMwZjE3MmEiLz4KICA8cGF0aCBkPSJNMjAgMTJoMjRNMjAgNTJoMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSI1IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cGF0aCBkPSJNMjUgMjFoMTRsLTcgMTEgNyAxMUgyNWw3LTExeiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjQuNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0yOSA0MGg2bC0zLTR6IiBmaWxsPSIjNjBhNWZhIi8+CiAgPHBhdGggZD0iTTMyIDMzdjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzYwYTVmYSIgc3Ryb2tlLXdpZHRoPSIyLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K">
+  <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAIXSURBVFhHY2DAAXgkdTT4xbUS+MU1GyjHWgn8oloG6HZgAnl5Dn4xzXZ+Ma3v/OJa/2mCxbSWc4lqSaBbzQByIb+Y5nUMDTTBms/5xbUdELbLy3PwiWndx1RIO8wnrvkeHhL84lrT0RXQB2tuh8Y7/jhX07X73949lWRsau2NYRY6hsQ9Fglk3Ddp9n9ywO69hzHMQscM/GIaBeiC6NjFK/L/4aOnSMZRCbkYZqFjBmg+xZCgFx56Dpi7YAV6VKMAYuIdGZPsgJu376HbiQHQ9eDDJDugsKwRbhEod3gHxqOIgUIIXQ8+TLIDQBiUwkHgxcvX/8XlDDH46OrxYbIcACpgvv/4Abb00uXrcN8Tk+3QMVkOAGFQSYcM1qzfiqGGGEy2A0BB/fDRk/+vv/wDO0DXxBVDDTGYbAcER6aBLU5Y+gtMN7T0YaghBpPlAJDvQQkO2QGgNEFM5YOOyXLAtJkLwZbef/3jf/zi7/+P3XgP5oNyA7paQphkB4AqJhgomH3xv0/T8f9xvaf+//oDEcvMq8LQgw+T7IBTZy7AHYANfPjwCUMPPkyyA5DzPTZAcweAEiCo+MWF5dTMMfTgwyQ7gNqYgU9cqwJdEB3Ttk0oru2ALoiOadsm5NcXQBdExzRtE4IAn5jWfnQJemBQZwjsAHBHlEDfgDYYqXvGJ64RQVdHiGkUwC2HAWiX/DiGYqpi1I4pAE1sbPdBWYeAAAAAAElFTkSuQmCC">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd',
+              400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8',
+              800: '#1e40af', 900: '#1e3a8a'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <?!= include('Styles'); ?>
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-800 antialiased">
+
+  <!-- Cargando -->
+  <div id="bootScreen" class="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-slate-100">
+    <div class="spinner"></div>
+    <p class="text-sm font-medium text-slate-500">Cargando Control de Tiempo…</p>
+  </div>
+
+  <div id="appShell" class="hidden min-h-screen flex-col">
+
+    <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
+        <div class="flex items-center gap-2.5">
+          <span class="grid h-9 w-9 place-items-center rounded-xl bg-slate-900 text-lg text-white">⏱</span>
+          <div class="leading-tight">
+            <p class="text-sm font-semibold text-slate-900">Control de Tiempo</p>
+            <p id="userBadge" class="text-xs text-slate-500">—</p>
+          </div>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+          <a id="sheetLink" href="#" target="_blank" rel="noopener"
+             class="hidden text-xs font-medium text-slate-500 underline decoration-slate-300 hover:text-slate-800">
+            Hoja de cálculo
+          </a>
+          <button id="btnSwitchUser" type="button" class="hidden btn btn-ghost btn-sm">Cambiar usuario</button>
+        </div>
+      </div>
+      <nav class="mx-auto max-w-6xl px-4 pb-2">
+        <div id="tabs" class="tabs"></div>
+      </nav>
+    </header>
+
+    <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-5 sm:py-6">
+
+      <!-- ================================================ Identificación -->
+      <section id="page-identity" class="hidden">
+        <div class="mx-auto max-w-xl">
+          <div class="card p-6">
+            <h1 class="text-lg font-semibold text-slate-900">Identifícate</h1>
+            <p class="mt-1 text-sm text-slate-600">
+              Selecciona tu usuario para registrar tiempos. Sólo pueden entrar personas registradas
+              en la tabla <strong>Usuarios</strong>.
+            </p>
+
+            <div id="identityBlocked" class="mt-4 hidden rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"></div>
+
+            <label class="label mt-5" for="identitySelect">Usuario</label>
+            <select id="identitySelect" class="input"></select>
+
+            <button id="btnIdentify" type="button" class="btn btn-primary mt-4 w-full">Entrar</button>
+
+            <p class="mt-4 text-xs text-slate-500">
+              Se recuerda tu elección en este navegador. Si necesitas cambiar de usuario,
+              usa el botón «Cambiar usuario».
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================ Registro de tiempo -->
+      <section id="page-time" class="hidden">
+        <div class="grid gap-5 lg:grid-cols-3">
+
+          <div class="lg:col-span-2">
+            <form id="timeForm" class="card p-5 sm:p-6" novalidate autocomplete="off">
+
+              <!-- Proyecto -->
+              <div class="relative">
+                <label class="label" for="projectInput">Proyecto <span class="text-rose-500">*</span></label>
+                <div class="relative">
+                  <input id="projectInput" type="text" class="input pr-9"
+                         placeholder="Escribe el número o el nombre del proyecto…"
+                         role="combobox" aria-expanded="false" aria-controls="projectList" aria-autocomplete="list">
+                  <button id="projectClear" type="button" aria-label="Limpiar proyecto"
+                          class="absolute inset-y-0 right-0 hidden px-3 text-lg leading-none text-slate-400 hover:text-slate-700">×</button>
+                  <ul id="projectList" class="combo-list hidden" role="listbox"></ul>
+                </div>
+                <p id="projectHint" class="hint">Escribe y elige una opción de la lista.</p>
+              </div>
+
+              <!-- Tipo de actividad -->
+              <div class="relative mt-4">
+                <label class="label" for="typeInput">Tipo de actividad <span class="text-rose-500">*</span></label>
+                <div class="relative">
+                  <input id="typeInput" type="text" class="input" placeholder="Escribe las primeras letras…"
+                         role="combobox" aria-expanded="false" aria-controls="typeList" aria-autocomplete="list">
+                  <ul id="typeList" class="combo-list hidden" role="listbox"></ul>
+                </div>
+                <p id="typeHint" class="hint"></p>
+              </div>
+
+              <!-- Fecha y horas -->
+              <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label class="label" for="entryDate">Fecha <span class="text-rose-500">*</span></label>
+                  <input id="entryDate" type="date" class="input">
+                </div>
+                <div>
+                  <label class="label" for="startTime">Hora inicio <span class="text-rose-500">*</span></label>
+                  <input id="startTime" type="time" step="600" class="input">
+                </div>
+                <div>
+                  <label class="label" for="endTime">Hora fin</label>
+                  <input id="endTime" type="time" step="600" class="input">
+                </div>
+              </div>
+
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                <button id="btnNow" type="button" class="btn btn-ghost btn-sm">Usar hora actual</button>
+                <span id="durationPreview" class="badge">—</span>
+                <span id="dateWarning" class="badge badge-off hidden">Fecha distinta a hoy</span>
+              </div>
+
+              <!-- Actividad -->
+              <div class="mt-4">
+                <label class="label" for="activity">Actividad <span class="text-rose-500">*</span></label>
+                <input id="activity" type="text" class="input" maxlength="300" placeholder="¿Qué hiciste en ese tiempo?">
+              </div>
+
+              <!-- Observaciones -->
+              <div class="mt-4">
+                <label class="label" for="notes">Observaciones</label>
+                <textarea id="notes" rows="3" class="input resize-y" maxlength="1500"
+                          placeholder="Detalles, acuerdos, bloqueos, enlaces…"></textarea>
+              </div>
+
+              <p id="formError" class="mt-4 hidden rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700"></p>
+
+              <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+                <button id="btnReset" type="button" class="btn btn-ghost">Limpiar formulario</button>
+                <button id="btnSave" type="submit" class="btn btn-primary">Guardar registro</button>
+              </div>
+            </form>
+          </div>
+
+          <aside class="space-y-4">
+            <div class="card p-5">
+              <div class="flex items-baseline justify-between">
+                <h2 class="text-sm font-semibold text-slate-900">Registros del día</h2>
+                <span id="dayTotal" class="badge">0 min</span>
+              </div>
+              <p id="dayDate" class="mt-0.5 text-xs text-slate-500">—</p>
+              <ul id="dayList" class="mt-3 space-y-2"></ul>
+              <p id="dayEmpty" class="mt-3 rounded-lg bg-slate-50 px-3 py-4 text-center text-xs text-slate-500">
+                Todavía no hay registros para esta fecha.
+              </p>
+            </div>
+
+            <div class="card p-5">
+              <h2 class="text-sm font-semibold text-slate-900">Atajos</h2>
+              <ul class="mt-2 space-y-1 text-xs text-slate-600">
+                <li><kbd class="rounded border border-slate-300 px-1">Enter</kbd> guarda el registro.</li>
+                <li>Las horas se redondean a <?= roundMinutes ?> minutos.</li>
+                <li>Si dejas la hora fin vacía se usa la hora actual.</li>
+                <li>Al guardar, la hora fin pasa a ser la hora inicio del siguiente registro.</li>
+              </ul>
+            </div>
+          </aside>
+
+        </div>
+      </section>
+
+
+
+      <!-- ================================================ Mantenimiento de tablas -->
+      <section id="page-table" class="hidden">
+        <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div class="relative flex-1">
+            <input id="tableSearch" type="search" class="input pl-9" placeholder="Buscar en la tabla…">
+            <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">⌕</span>
+          </div>
+          <div class="flex items-center justify-end gap-2">
+            <span id="tableCount" class="text-xs text-slate-500"></span>
+            <button id="btnNewRow" type="button" class="btn btn-primary btn-sm">Nuevo registro</button>
+          </div>
+        </div>
+        <div class="card overflow-hidden">
+          <div id="tableHost" class="table-wrap"></div>
+        </div>
+        <p id="tableHint" class="mt-2 text-xs text-slate-500"></p>
+      </section>
+
+      <!-- ================================================ Consulta de registros -->
+      <section id="page-entries" class="hidden">
+        <form id="entriesFilter" class="card mb-4 p-4">
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div>
+              <label class="label" for="filterFrom">Desde</label>
+              <input id="filterFrom" type="date" class="input">
+            </div>
+            <div>
+              <label class="label" for="filterTo">Hasta</label>
+              <input id="filterTo" type="date" class="input">
+            </div>
+            <div>
+              <label class="label" for="filterUser">Usuario</label>
+              <select id="filterUser" class="input"></select>
+            </div>
+            <div>
+              <label class="label" for="filterProject">Proyecto</label>
+              <input id="filterProject" type="text" class="input" placeholder="Número o nombre">
+            </div>
+            <div class="flex items-end">
+              <button id="btnFilter" type="submit" class="btn btn-primary w-full">Buscar</button>
+            </div>
+          </div>
+        </form>
+        <div class="card overflow-hidden">
+          <div id="entriesHost" class="table-wrap"></div>
+        </div>
+        <p id="entriesSummary" class="mt-2 text-xs text-slate-500"></p>
+      </section>
+
+    </main>
+
+    <footer class="mx-auto w-full max-w-6xl px-4 pb-8 pt-2 text-center text-xs text-slate-400">
+      Control de Tiempo · Google Apps Script + Google Sheets
+    </footer>
+  </div>
+
+  <div id="toasts" class="pointer-events-none fixed bottom-4 right-4 z-[70] flex flex-col items-end gap-2"></div>
+  <div id="modalRoot"></div>
+
+  <?!= include('ClientCore'); ?>
+  <?!= include('ClientTime'); ?>
+  <?!= include('ClientTables'); ?>
+  <?!= include('ClientApp'); ?>
+</body>
+</html>

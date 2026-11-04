@@ -1,0 +1,16 @@
+# Dependencias
+node_modules/
+
+# Credenciales de clasp (nunca deben versionarse)
+.clasprc.json
+.clasprc.json.*
+
+# Archivos temporales de las verificaciones locales
+.smoke*
+.check_*
+.bak_*
+
+# Basura del sistema operativo
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,11 @@
+# Normaliza los finales de línea en el repositorio (LF) y los deja en CRLF
+# al hacer checkout, que es como los usa clasp en Windows.
+* text=auto
+*.gs   text eol=crlf
+*.html text eol=crlf
+*.js   text eol=crlf
+*.json text eol=crlf
+*.md   text eol=crlf
+*.svg  text eol=crlf
+*.png  binary
+*.ico  binary

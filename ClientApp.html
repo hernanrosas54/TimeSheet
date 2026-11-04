@@ -1,0 +1,243 @@
+<script>
+/**
+ * Arranque de la aplicación: carga inicial, identificación y navegación.
+ */
+window.App = (function () {
+  function el(id) {
+    return document.getElementById(id);
+  }
+
+  /* ------------------------------------------------------------ Arranque */
+  function applyBootstrap(data) {
+    const state = Core.state;
+    const identity = data.identity || {};
+
+    state.app = data.app || {};
+    state.identity = identity;
+    state.schemas = data.schemas || state.schemas;
+    state.user = identity.user || null;
+    state.clients = data.clients || [];
+    state.projects = data.projects || [];
+    state.activityTypes = data.activityTypes || [];
+    state.users = data.users || identity.availableUsers || [];
+    state.defaults = data.defaults || {};
+
+    const link = el('sheetLink');
+    if (state.app.spreadsheetUrl) {
+      link.href = state.app.spreadsheetUrl;
+      link.classList.remove('hidden');
+    } else {
+      link.classList.add('hidden');
+    }
+
+    document.title = state.app.title || 'Control de Tiempo';
+  }
+
+  function renderIdentity() {
+    const identity = Core.state.identity || {};
+    const select = el('identitySelect');
+    const button = el('btnIdentify');
+    const blocked = el('identityBlocked');
+
+    const users = identity.availableUsers || [];
+    select.innerHTML = '<option value="">Selecciona tu usuario…</option>' +
+      users.map(function (user) {
+        return '<option value="' + Core.escapeHtml(user.codigo) + '">' +
+          Core.escapeHtml(user.codigo + ' · ' + user.nombre) + '</option>';
+      }).join('');
+    select.value = '';
+
+    let message = '';
+    let enabled = users.length > 0;
+
+    if (identity.reason === 'NO_USERS') {
+      message = 'Todavía no hay usuarios registrados. Abre la hoja de cálculo y agrega al menos ' +
+        'un usuario en la tabla Usuarios (código de 2 letras, nombre y correo).';
+      enabled = false;
+    } else if (identity.reason === 'EMAIL_NOT_AUTHORIZED') {
+      message = 'La cuenta ' + identity.email + ' no está registrada en la tabla Usuarios. ' +
+        'Pide al administrador que agregue tu correo o entra con una cuenta autorizada.';
+      enabled = false;
+    } else if (identity.reason === 'IDENTIFY') {
+      message = identity.emailVisible
+        ? 'Tu cuenta (' + identity.email + ') todavía no está vinculada a un usuario. ' +
+          'Elige tu nombre en la lista para recordar la identificación en este navegador.'
+        : 'No fue posible leer tu cuenta de Google desde el navegador. Elige tu nombre en la lista.';
+    }
+
+    blocked.textContent = message;
+    blocked.classList.toggle('hidden', !message);
+
+    select.disabled = !enabled;
+    button.disabled = !enabled;
+    button.textContent = users.length ? 'Entrar' : 'Sin usuarios disponibles';
+  }
+
+  function showIdentityPage() {
+    Core.state.page = 'identity';
+    el('tabs').innerHTML = '';
+    el('btnSwitchUser').classList.add('hidden');
+    Core.showSection('identity');
+    renderIdentity();
+  }
+
+  function startApp() {
+    el('appShell').classList.remove('hidden');
+    el('appShell').classList.add('flex');
+
+    const user = Core.state.user;
+
+    if (!user) {
+      showIdentityPage();
+      return;
+    }
+
+    el('userBadge').textContent = user.codigo + ' · ' + user.nombre;
+    el('userBadge').className = 'text-xs font-medium text-slate-600';
+    el('btnSwitchUser').classList.remove('hidden');
+
+    // Cambio de usuario explícito: aunque el correo siga vinculado, se muestra
+    // la pantalla de identificación para elegir otro usuario.
+    if (Core.state.page === 'identity') {
+      showIdentityPage();
+      return;
+    }
+
+    TimePage.init();
+    TablesPage.init();
+
+    const page = Core.state.page || 'time';
+    Core.navigate(page);
+  }
+
+  async function boot() {
+    try {
+      const data = await Core.call('apiBootstrap');
+      applyBootstrap(data);
+      startApp();
+    } catch (error) {
+      const screen = el('bootScreen');
+      screen.innerHTML =
+        '<div class="card max-w-md p-6 text-center">' +
+          '<p class="text-2xl">⚠</p>' +
+          '<h1 class="mt-2 text-base font-semibold text-slate-900">No se pudo iniciar la aplicación</h1>' +
+          '<p class="mt-2 text-sm text-slate-600">' + Core.escapeHtml(error.message) + '</p>' +
+          '<button type="button" class="btn btn-primary mt-4" id="bootRetry">Reintentar</button>' +
+        '</div>';
+      const retry = el('bootRetry');
+      if (retry) {
+        retry.addEventListener('click', function () {
+          window.location.reload();
+        });
+      }
+      return;
+    }
+
+    el('bootScreen').classList.add('hidden');
+  }
+
+
+  /* ------------------------------------------------------------ Identificación */
+  async function identify() {
+    const select = el('identitySelect');
+    const code = select.value;
+
+    if (!code) {
+      Core.toast('Selecciona tu usuario de la lista.', 'error');
+      select.focus();
+      return;
+    }
+
+    const button = el('btnIdentify');
+    Core.setBusy(button, true, 'Entrando…');
+
+    try {
+      const data = await Core.call('apiIdentifyUser', code);
+      applyBootstrap(data);
+
+      if (!Core.state.user) {
+        Core.toast('No se pudo identificar el usuario. Revisa la tabla Usuarios.', 'error');
+        renderIdentity();
+        return;
+      }
+
+      Core.state.page = 'time';
+      startApp();
+      Core.toast('Bienvenido, ' + Core.state.user.nombre + '.', 'success');
+    } catch (error) {
+      Core.toast(error.message, 'error');
+      renderIdentity();
+    } finally {
+      Core.setBusy(button, false);
+    }
+  }
+
+  async function switchUser() {
+    const confirmed = await Core.confirmDialog(
+      'Cambiar usuario',
+      'Se olvidará el usuario recordado en este navegador y volverás a la pantalla de identificación.',
+      'Cambiar usuario'
+    );
+    if (!confirmed) return;
+
+    try {
+      const data = await Core.call('apiForgetIdentity');
+      applyBootstrap(data);
+      Core.state.page = 'identity';
+      startApp();
+
+      if (Core.state.user) {
+        Core.toast('Tu correo está vinculado a ' + Core.state.user.codigo +
+          ', por eso sigues identificado automáticamente.', 'info');
+      }
+    } catch (error) {
+      Core.toast(error.message, 'error');
+    }
+  }
+
+  /* ------------------------------------------------------------ Catálogos */
+  /** Recarga catálogos (proyectos, clientes, tipos, usuarios) tras editar tablas. */
+  async function refreshCatalogs() {
+    try {
+      const data = await Core.call('apiBootstrap');
+      applyBootstrap(data);
+
+      if (!Core.state.user) {
+        showIdentityPage();
+        return;
+      }
+
+      el('userBadge').textContent = Core.state.user.codigo + ' · ' + Core.state.user.nombre;
+      if (window.TimePage) TimePage.refresh();
+      if (window.TablesPage && Core.state.page === 'entries') TablesPage.loadEntries();
+    } catch (error) {
+      Core.toast('No se pudieron actualizar los catálogos: ' + error.message, 'error');
+    }
+  }
+
+  /* ------------------------------------------------------------ Arranque */
+  function init() {
+    el('btnIdentify').addEventListener('click', identify);
+
+    el('identitySelect').addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        identify();
+      }
+    });
+
+    el('btnSwitchUser').addEventListener('click', switchUser);
+
+    boot();
+  }
+
+  init();
+
+  return {
+    boot: boot,
+    identify: identify,
+    switchUser: switchUser,
+    refreshCatalogs: refreshCatalogs
+  };
+})();
+</script>

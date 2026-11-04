@@ -1,0 +1,8 @@
+# Archivos que no deben subirse al proyecto de Apps Script.
+tests/**
+node_modules/**
+.smoke*
+.check_*
+.bak_*
+assets/**
+*.md

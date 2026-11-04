@@ -1,0 +1,515 @@
+<script>
+/**
+ * Mantenimiento de las tablas (proyectos, clientes, usuarios, tipos de
+ * actividad) y consulta de registros de tiempo.
+ */
+window.TablesPage = (function () {
+  const state = {
+    table: '',
+    rows: [],
+    search: '',
+    clients: [],
+    entries: [],
+    filtersReady: false,
+    loading: false
+  };
+
+  function el(id) {
+    return document.getElementById(id);
+  }
+
+  /* ------------------------------------------------------------ Tablas */
+  async function showTable(name) {
+    state.table = name;
+    state.search = '';
+    el('tableSearch').value = '';
+    el('tableSearch').placeholder = 'Buscar en ' + name.toLowerCase() + '…';
+    el('tableHint').textContent = hintFor(name);
+    await loadTable();
+  }
+
+  function hintFor(name) {
+    if (name === 'Proyectos') {
+      return 'Haz clic en el nombre para editar el proyecto. El número se asigna automáticamente si lo dejas vacío y el número de cliente en 0 indica que no tiene empresa asociada. Las horas se calculan desde la hoja Tiempos; los demás datos también puedes editarlos directamente en la hoja de cálculo.';
+    }
+    if (name === 'Clientes') {
+      return 'Haz clic en el nombre para editar el cliente. El número se asigna automáticamente si lo dejas vacío.';
+    }
+    if (name === 'Usuarios') {
+      return 'Haz clic en el nombre para editar el usuario. El código debe tener exactamente 2 letras y cualquiera de los 3 correos sirve para autorizar el acceso.';
+    }
+    if (name === 'TiposActividad') {
+      return 'Haz clic en el tipo para editarlo. Esta lista alimenta el desplegable de tipos de actividad y la validación de la hoja Tiempos.';
+    }
+    return '';
+  }
+
+  async function loadTable() {
+    el('tableHost').innerHTML = '<div class="p-8 text-center text-sm text-slate-500">Cargando…</div>';
+    try {
+      const data = await Core.call('apiListTable', state.table);
+      state.rows = data.rows || [];
+      state.clients = data.clients || [];
+      if (data.schema) Core.state.schemas[state.table] = data.schema;
+      renderTable();
+    } catch (error) {
+      el('tableHost').innerHTML = '<div class="p-8 text-center text-sm text-rose-600">' +
+        Core.escapeHtml(error.message) + '</div>';
+    }
+  }
+
+  /** Campos que no participan en la búsqueda (internos o calculados). */
+  function skippedFields() {
+    const schema = Core.state.schemas[state.table];
+    const skip = new Set(['_row']);
+    if (schema && schema.computedFields) {
+      schema.computedFields.forEach(function (field) {
+        skip.add(field);
+      });
+    }
+    return skip;
+  }
+
+  function filteredRows() {
+    const query = Core.normalize(state.search);
+    if (!query) return state.rows;
+    const skip = skippedFields();
+    return state.rows.filter(function (row) {
+      return Object.keys(row).some(function (key) {
+        if (skip.has(key)) return false;
+        return Core.normalize(row[key]).indexOf(query) !== -1;
+      });
+    });
+  }
+
+  /** En las tablas con editor el nombre del registro es el enlace de edición. */
+  function isLabelColumn(column) {
+    const schema = Core.state.schemas[state.table];
+    if (!schema || !schema.labelField) return false;
+    return column.field === schema.labelField;
+  }
+
+  function cellValue(row, column) {
+    const value = row[column.field];
+
+    if (column.computed) {
+      const minutes = Number(value) || 0;
+      const hint = Core.escapeHtml(column.title || column.label);
+      if (!minutes) return '<span class="text-slate-400" title="' + hint + '">—</span>';
+      return '<span class="num" title="' + hint + '">' + Core.escapeHtml(Core.formatMinutes(minutes)) +
+        '</span>';
+    }
+
+    if (column.type === 'boolean') {
+      return value === true
+        ? '<span class="badge badge-ok">Sí</span>'
+        : '<span class="badge badge-off">No</span>';
+    }
+
+    if (column.field === 'numeroCliente') {
+      const clientName = row.clienteNombre || '';
+      const label = value && value !== '0' ? value + (clientName ? ' · ' + clientName : '') : '—';
+      return Core.escapeHtml(label);
+    }
+
+    if (column.type === 'number') {
+      return '<span class="num">' + Core.escapeHtml(Core.formatMinutes(value)) + '</span>';
+    }
+
+    const text = String(value == null ? '' : value);
+    if (!text) return '<span class="text-slate-400">—</span>';
+
+    if (isLabelColumn(column) && row._row) {
+      return '<a href="#" class="link-cell" data-action="edit" data-row="' + row._row +
+        '" title="Editar: ' + Core.escapeHtml(text) + '">' + Core.escapeHtml(text) + '</a>';
+    }
+
+    return '<span class="truncate-cell" title="' + Core.escapeHtml(text) + '">' +
+      Core.escapeHtml(text) + '</span>';
+  }
+
+  function renderTable() {
+    const schema = Core.state.schemas[state.table];
+    const host = el('tableHost');
+    const rows = filteredRows();
+
+    if (!schema) {
+      host.innerHTML = '<div class="p-8 text-center text-sm text-slate-500">Tabla no disponible.</div>';
+      return;
+    }
+
+    el('tableCount').textContent = rows.length + ' de ' + state.rows.length + ' registro' +
+      (state.rows.length === 1 ? '' : 's');
+
+    if (!rows.length) {
+      host.innerHTML = '<div class="p-8 text-center text-sm text-slate-500">' +
+        (state.rows.length ? 'Ningún registro coincide con la búsqueda.' : 'Todavía no hay registros.') +
+        '</div>';
+      return;
+    }
+
+    const header = schema.columns.map(function (column) {
+      const title = column.title ? ' title="' + Core.escapeHtml(column.title) + '"' : '';
+      const style = column.computed ? ' style="text-align:right"' : '';
+      return '<th' + style + title + '>' + Core.escapeHtml(column.label) + '</th>';
+    }).join('');
+
+    const body = rows.map(function (row) {
+      const cells = schema.columns.map(function (column) {
+        return '<td>' + cellValue(row, column) + '</td>';
+      }).join('');
+      return '<tr>' + cells + '</tr>';
+    }).join('');
+
+    host.innerHTML = '<table class="data"><thead><tr>' + header + '</tr></thead><tbody>' + body + '</tbody></table>';
+
+    host.querySelectorAll('[data-action="edit"]').forEach(function (link) {
+      link.addEventListener('click', function (event) {
+        if (event && event.preventDefault) event.preventDefault();
+        const rowNumber = Number(link.dataset.row);
+        const row = state.rows.filter(function (item) {
+          return item._row === rowNumber;
+        })[0];
+        openEditor(row || null);
+      });
+    });
+  }
+
+
+  /* ------------------------------------------------------------ Editor */
+  const SINGULAR = {
+    Proyectos: 'proyecto',
+    Clientes: 'cliente',
+    Usuarios: 'usuario',
+    TiposActividad: 'tipo de actividad',
+    Tiempos: 'registro'
+  };
+
+  /** Columnas editables: las calculadas solo se muestran, nunca se guardan. */
+  function editableColumns(schema) {
+    return (schema.columns || []).filter(function (column) {
+      return !column.computed;
+    });
+  }
+
+  function controlFor(column, row, isCreate) {
+    const field = column.field;
+    const value = row && row[field] != null ? row[field] : '';
+    const id = 'f_' + field;
+    const disabled = (!isCreate && column.readOnlyOnEdit) ? ' disabled' : '';
+    const label = '<label class="label" for="' + id + '">' + Core.escapeHtml(column.label) +
+      (column.required ? ' <span class="text-rose-500">*</span>' : '') + '</label>';
+    const hint = column.hint ? '<p class="hint">' + Core.escapeHtml(column.hint) + '</p>' : '';
+
+    if (column.type === 'boolean') {
+      const checked = (value === true || String(value).toLowerCase() === 'true') ? ' checked' : '';
+      return '<div class="sm:col-span-2">' +
+        '<label class="flex items-center gap-2 text-sm font-medium text-slate-700" for="' + id + '">' +
+          '<input id="' + id + '" type="checkbox" class="h-4 w-4 rounded border-slate-300"' + checked + disabled + '>' +
+          '<span>' + Core.escapeHtml(column.label) + '</span>' +
+        '</label>' + hint +
+      '</div>';
+    }
+
+    let control = '';
+
+    if (column.input === 'select' && column.options === 'clients') {
+      const options = ['<option value="0">Sin cliente (0)</option>'].concat(
+        (state.clients || []).map(function (client) {
+          const selected = String(client.numero) === String(value || '0') ? ' selected' : '';
+          return '<option value="' + Core.escapeHtml(client.numero) + '"' + selected + '>' +
+            Core.escapeHtml(client.numero + ' · ' + client.nombre) + '</option>';
+        })
+      ).join('');
+      control = '<select id="' + id + '" class="input"' + disabled + '>' + options + '</select>';
+    } else if (column.input === 'textarea') {
+      control = '<textarea id="' + id + '" rows="2" class="input resize-y"' + disabled + '>' +
+        Core.escapeHtml(value) + '</textarea>';
+    } else if (column.input === 'date') {
+      control = '<input id="' + id + '" type="date" class="input" value="' +
+        Core.escapeHtml(/^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? value : '') + '"' + disabled + '>';
+    } else if (column.input === 'email') {
+      control = '<input id="' + id + '" type="email" class="input" value="' +
+        Core.escapeHtml(value) + '"' + disabled + '>';
+    } else {
+      control = '<input id="' + id + '" type="text" class="input" value="' +
+        Core.escapeHtml(value) + '"' + disabled + '>';
+    }
+
+    const wide = column.input === 'textarea' ? ' sm:col-span-2' : '';
+    return '<div class="' + wide.trim() + '">' + label + control + hint + '</div>';
+  }
+
+  function openEditor(row) {
+    const schema = Core.state.schemas[state.table];
+    if (!schema) return;
+
+    const isCreate = !row;
+    const singular = SINGULAR[state.table] || 'registro';
+    const fields = editableColumns(schema).map(function (column) {
+      return controlFor(column, row, isCreate);
+    }).join('');
+
+    const panel = Core.openModal(
+      '<form id="rowForm" class="p-5 sm:p-6" novalidate autocomplete="off">' +
+        '<div class="flex items-start justify-between gap-3">' +
+          '<div>' +
+            '<h3 class="text-base font-semibold text-slate-900">' +
+              (isCreate ? 'Nuevo ' : 'Editar ') + Core.escapeHtml(singular) + '</h3>' +
+            '<p class="mt-0.5 text-xs text-slate-500">' + Core.escapeHtml(state.table) +
+              (isCreate ? ' · los campos con * son obligatorios.' : ' · fila ' + (row._row || '')) + '</p>' +
+          '</div>' +
+          '<button type="button" data-action="cancel" aria-label="Cerrar" ' +
+            'class="-mr-1 -mt-1 rounded-lg px-2 text-xl leading-none text-slate-400 hover:text-slate-700">×</button>' +
+        '</div>' +
+        '<div class="mt-4 max-h-[65vh] overflow-y-auto pr-1"><div class="grid gap-3 sm:grid-cols-2">' +
+          fields +
+        '</div></div>' +
+        '<p id="rowError" class="mt-3 hidden rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700"></p>' +
+        '<div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">' +
+          '<button type="button" class="btn btn-ghost" data-action="cancel">Cancelar</button>' +
+          '<button type="submit" class="btn btn-primary" id="rowSave">Guardar</button>' +
+        '</div>' +
+      '</form>'
+    );
+
+    panel.querySelectorAll('[data-action="cancel"]').forEach(function (button) {
+      button.addEventListener('click', Core.closeModal);
+    });
+
+    panel.querySelector('#rowForm').addEventListener('submit', function (event) {
+      event.preventDefault();
+      saveRow(panel, row);
+    });
+  }
+
+
+  async function saveRow(panel, row) {
+    const schema = Core.state.schemas[state.table];
+    const isCreate = !row;
+    const errorBox = panel.querySelector('#rowError');
+    const button = panel.querySelector('#rowSave');
+    const payload = { _row: isCreate ? 0 : (row._row || 0) };
+
+    editableColumns(schema).forEach(function (column) {
+      const input = panel.querySelector('#f_' + column.field);
+      if (!input) return;
+      if (column.type === 'boolean') {
+        payload[column.field] = input.checked;
+      } else {
+        payload[column.field] = String(input.value == null ? '' : input.value).trim();
+      }
+    });
+
+    const missing = editableColumns(schema).filter(function (column) {
+      if (!column.required) return false;
+      if (!isCreate && column.readOnlyOnEdit) return false;
+      // La clave numérica puede generarse sola al crear (autoKey).
+      if (isCreate && schema.autoKey && column.field === schema.key) return false;
+      return String(payload[column.field] == null ? '' : payload[column.field]).trim() === '';
+    })[0];
+
+    if (missing) {
+      errorBox.textContent = 'El campo «' + missing.label + '» es obligatorio.';
+      errorBox.classList.remove('hidden');
+      return;
+    }
+
+    errorBox.classList.add('hidden');
+    Core.setBusy(button, true, 'Guardando…');
+
+    try {
+      await Core.call('apiSaveTableRow', state.table, payload);
+      Core.closeModal();
+      Core.toast('Registro guardado en ' + state.table + '.', 'success');
+      await loadTable();
+      if (window.App) App.refreshCatalogs();
+    } catch (error) {
+      errorBox.textContent = error.message;
+      errorBox.classList.remove('hidden');
+      Core.setBusy(button, false);
+    }
+  }
+
+  /* ------------------------------------------------------------ Registros de tiempo */
+  function firstOfMonth(iso) {
+    return String(iso || Core.todayIso()).slice(0, 7) + '-01';
+  }
+
+  async function loadUsers() {
+    if (Core.state.users && Core.state.users.length) return Core.state.users;
+    const data = await Core.call('apiListTable', 'Usuarios');
+    Core.state.users = (data.rows || []).map(function (row) {
+      return { codigo: String(row.codigo || '').toUpperCase(), nombre: row.nombre || '' };
+    });
+    return Core.state.users;
+  }
+
+  function renderUserOptions(users) {
+    const select = el('filterUser');
+    const current = select.value;
+    select.innerHTML = '<option value="">Todos los usuarios</option>' +
+      (users || []).map(function (user) {
+        return '<option value="' + Core.escapeHtml(user.codigo) + '">' +
+          Core.escapeHtml(user.codigo + ' · ' + user.nombre) + '</option>';
+      }).join('');
+    select.value = current || '';
+  }
+
+  async function showEntries() {
+    await initFilters();
+    loadEntries();
+  }
+
+  async function initFilters() {
+    if (state.filtersReady) return;
+    state.filtersReady = true;
+
+    const today = Core.state.app.today || Core.todayIso();
+    if (!el('filterFrom').value) el('filterFrom').value = firstOfMonth(today);
+    if (!el('filterTo').value) el('filterTo').value = today;
+
+    el('entriesFilter').addEventListener('submit', function (event) {
+      event.preventDefault();
+      loadEntries();
+    });
+
+    try {
+      renderUserOptions(await loadUsers());
+    } catch (error) {
+      renderUserOptions([]);
+    }
+  }
+
+  async function loadEntries() {
+    if (state.loading) return;
+    state.loading = true;
+
+    const payload = {
+      desde: el('filterFrom').value,
+      hasta: el('filterTo').value,
+      codigoUsuario: el('filterUser').value,
+      proyecto: el('filterProject').value.trim()
+    };
+
+    el('entriesHost').innerHTML = '<div class="p-8 text-center text-sm text-slate-500">Buscando…</div>';
+
+    try {
+      const result = await Core.call('apiListEntries', payload);
+      state.entries = result.entries || [];
+      renderEntries(result);
+    } catch (error) {
+      el('entriesHost').innerHTML = '<div class="p-8 text-center text-sm text-rose-600">' +
+        Core.escapeHtml(error.message) + '</div>';
+      el('entriesSummary').textContent = '';
+    } finally {
+      state.loading = false;
+    }
+  }
+
+  function renderEntries(result) {
+    const host = el('entriesHost');
+    const entries = (result && result.entries) || [];
+
+    if (!entries.length) {
+      host.innerHTML = '<div class="p-8 text-center text-sm text-slate-500">' +
+        'No hay registros en el rango seleccionado.</div>';
+      el('entriesSummary').textContent = '0 registros.';
+      return;
+    }
+
+    const header = '<tr>' +
+      '<th>Fecha</th><th>Horario</th><th>Usuario</th><th>Proyecto</th>' +
+      '<th>Tipo</th><th>Actividad</th><th class="text-right">Tiempo</th><th></th>' +
+      '</tr>';
+
+    const body = entries.map(function (entry) {
+      const projectCell = Core.escapeHtml(entry.proyecto) +
+        (entry.proyectoNombre
+          ? '<br><span class="text-[11px] text-slate-500">' + Core.escapeHtml(entry.proyectoNombre) + '</span>'
+          : '');
+      const activityCell = '<span class="truncate-cell" title="' + Core.escapeHtml(entry.actividad) + '">' +
+          Core.escapeHtml(entry.actividad) + '</span>' +
+        (entry.observaciones
+          ? '<br><span class="text-[11px] text-slate-500 truncate-cell" title="' +
+            Core.escapeHtml(entry.observaciones) + '">' + Core.escapeHtml(entry.observaciones) + '</span>'
+          : '');
+
+      return '<tr>' +
+        '<td class="whitespace-nowrap">' + Core.escapeHtml(Core.formatDateEs(entry.fecha)) + '</td>' +
+        '<td class="whitespace-nowrap">' + Core.escapeHtml(entry.horaInicio) + '–' +
+          Core.escapeHtml(entry.horaFin) + '</td>' +
+        '<td class="whitespace-nowrap">' + Core.escapeHtml(entry.usuarioNombre || entry.codigoUsuario) +
+          '<br><span class="text-[11px] text-slate-500">' + Core.escapeHtml(entry.codigoUsuario) + '</span></td>' +
+        '<td>' + projectCell + '</td>' +
+        '<td>' + Core.escapeHtml(entry.tipoActividad) + '</td>' +
+        '<td>' + activityCell + '</td>' +
+        '<td class="num whitespace-nowrap">' + Core.formatMinutes(entry.minutos) + '</td>' +
+        '<td class="text-right"><button type="button" class="btn btn-danger btn-sm" data-row="' +
+          entry._row + '">Eliminar</button></td>' +
+      '</tr>';
+    }).join('');
+
+    host.innerHTML = '<table class="data"><thead>' + header + '</thead><tbody>' + body + '</tbody></table>';
+
+    host.querySelectorAll('[data-row]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        const rowNumber = Number(button.dataset.row);
+        const entry = state.entries.filter(function (item) {
+          return item._row === rowNumber;
+        })[0];
+        if (entry) removeEntry(entry);
+      });
+    });
+
+    const summary = result.count + ' registro' + (result.count === 1 ? '' : 's') +
+      ' · total ' + Core.formatMinutes(result.totalMinutos);
+    el('entriesSummary').textContent = summary +
+      (result.truncated ? ' · se muestran los primeros ' + entries.length : '');
+  }
+
+  async function removeEntry(entry) {
+    const confirmed = await Core.confirmDialog(
+      'Eliminar registro',
+      'Se eliminará el registro del ' + Core.formatDateEs(entry.fecha) + ' (' +
+        entry.horaInicio + '–' + entry.horaFin + ', ' + Core.formatMinutes(entry.minutos) +
+        '). Esta acción no se puede deshacer.',
+      'Eliminar'
+    );
+    if (!confirmed) return;
+
+    try {
+      await Core.call('apiDeleteTimeEntry', entry._row);
+      Core.toast('Registro eliminado.', 'success');
+      if (window.TimePage) TimePage.loadDay();
+      loadEntries();
+    } catch (error) {
+      Core.toast(error.message, 'error');
+    }
+  }
+
+  /* ------------------------------------------------------------ Arranque */
+  function init() {
+    if (state.bound) return;
+    state.bound = true;
+
+    el('btnNewRow').addEventListener('click', function () {
+      openEditor(null);
+    });
+
+    el('tableSearch').addEventListener('input', function () {
+      state.search = el('tableSearch').value;
+      if (state.table) renderTable();
+    });
+  }
+
+  return {
+    init: init,
+    showTable: showTable,
+    showEntries: showEntries,
+    loadEntries: loadEntries,
+    openEditor: openEditor,
+    state: state
+  };
+})();
+</script>

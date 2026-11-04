@@ -1,0 +1,14 @@
+{
+  "scriptId": "1aYlN8DaaBzpc2Q0zQNRuwoxirfgNGg_KOtPFVV0Q6kDEA3ziFZ4P-7_0",
+  "rootDir": ".",
+  "scriptExtensions": ["gs"],
+  "filePushOrder": [
+    "Config.gs",
+    "Utils.gs",
+    "Auth.gs",
+    "Data.gs",
+    "Api.gs",
+    "Setup.gs",
+    "Code.gs"
+  ]
+}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Control de Tiempo">
+  <rect width="64" height="64" rx="14" fill="#0f172a"/>
+  <path d="M20 12h24M20 52h24" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+  <path d="M25 21h14l-7 11 7 11H25l7-11z" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linejoin="round"/>
+  <path d="M29 40h6l-3-4z" fill="#60a5fa"/>
+  <path d="M32 33v4" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round"/>
+</svg>
