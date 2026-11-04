@@ -133,7 +133,23 @@ const backend = {
   },
   apiDayEntries(fecha) {
     calls.push(['apiDayEntries', [fecha]]);
-    return { ok: true, data: { fecha: fecha, entries: [entry()], totalMinutos: 90, count: 1 } };
+    return {
+      ok: true,
+      data: {
+        fecha: fecha,
+        // El servidor devuelve los registros de menor a mayor hora de inicio;
+        // el panel del día debe mostrarlos al revés.
+        entries: [
+          entry({
+            _row: 9, horaInicio: '07:00', horaFin: '07:30', minutos: 30,
+            tipoActividad: 'Analisis', actividad: 'Revisión de backlog'
+          }),
+          entry()
+        ],
+        totalMinutos: 120,
+        count: 2
+      }
+    };
   },
   apiSaveTimeEntry(payload) {
     calls.push(['apiSaveTimeEntry', [payload]]);

@@ -31,11 +31,36 @@ const { context, get, calls, check, failures, tick } = env;
 
   // 2) Carga del dia y totales.
   check('apiDayEntries llamado', calls.some((c) => c[0] === 'apiDayEntries'));
-  check('total del dia formateado', get('dayTotal').textContent === '1 h 30 min', get('dayTotal').textContent);
+  check('total del dia formateado', get('dayTotal').textContent === '2 h', get('dayTotal').textContent);
   check('lista del dia con filas', /Maquetado/.test(get('dayList').innerHTML), get('dayList').innerHTML.slice(0, 160));
+  const dayHtml = get('dayList').innerHTML;
+  check('registros del dia por hora descendente',
+    dayHtml.indexOf('08:00') !== -1 && dayHtml.indexOf('07:00') !== -1 && dayHtml.indexOf('08:00') < dayHtml.indexOf('07:00'),
+    dayHtml.slice(0, 320));
+  check('boton copiar en cada registro', (dayHtml.match(/data-copy-entry=/g) || []).length === 2, dayHtml.slice(0, 320));
   check('fecha por defecto', get('entryDate').value === '2026-11-04', get('entryDate').value);
   check('hora inicio por defecto', get('startTime').value === '09:30', get('startTime').value);
   check('hint de tipos', /2 tipos disponibles/.test(get('typeHint').textContent), get('typeHint').textContent);
+
+  // 2b) Boton de copiar de un registro del dia al formulario.
+  const clickCopy = (index) => get('dayList').dispatch('click', {
+    target: {
+      closest: (selector) => (selector === '[data-copy-entry]' ? { dataset: { copyEntry: String(index) } } : null)
+    }
+  });
+
+  get('entryDate').value = '2026-11-04';
+  get('startTime').value = '09:30';
+  clickCopy(0);
+  check('copiar rellena el proyecto', get('projectInput').value === '15 · Sitio web', get('projectInput').value);
+  check('copiar rellena el tipo de actividad', get('typeInput').value === 'Programacion', get('typeInput').value);
+  check('copiar rellena la actividad', get('activity').value === 'Maquetado', get('activity').value);
+  check('copiar no toca las horas', get('startTime').value === '09:30' && get('endTime').value === '',
+    get('startTime').value + ' / ' + get('endTime').value);
+
+  clickCopy(1);
+  check('copiar el segundo registro', get('typeInput').value === 'Analisis' && get('activity').value === 'Revisión de backlog',
+    get('typeInput').value + ' / ' + get('activity').value);
 
   // 3) Vista previa de duracion.
   get('startTime').value = '08:00';

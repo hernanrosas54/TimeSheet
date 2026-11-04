@@ -14,6 +14,9 @@ Comprueba, entre otras cosas:
 - Arranque, identificación por correo, badge de usuario y pestañas.
 - Carga del día, totales, vista previa de duración y guardado de registros
   (incluidos los payloads enviados al servidor y las validaciones).
+- Panel de registros del día ordenado por hora de inicio descendente y botón
+  **Copiar** que rellena proyecto, tipo de actividad y actividad en el formulario
+  sin modificar la fecha ni las horas.
 - Botón **Ahora** junto a la hora de inicio: rellena la hora actual redondeada al
   paso configurado.
 - Listado de tablas con el nombre como enlace de edición (sin botones de alta
@@ -23,5 +26,5 @@ Comprueba, entre otras cosas:
   ascendente y tercero quita el orden.
 - Listado de registros de tiempo con filtros y cambio de usuario.
 
-Salida esperada: `Todas las comprobaciones pasaron.` (61 comprobaciones) y código
+Salida esperada: `Todas las comprobaciones pasaron.` (68 comprobaciones) y código
 de salida 0.
