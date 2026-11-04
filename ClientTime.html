@@ -84,6 +84,13 @@ window.TimePage = (function () {
       el('projectInput').focus();
     });
 
+    el('btnStartNow').addEventListener('click', function () {
+      const now = Core.currentRoundedTime(roundStep());
+      el('startTime').value = now;
+      el('startTime').classList.remove('is-invalid');
+      updatePreview();
+    });
+
     el('btnNow').addEventListener('click', function () {
       const now = Core.currentRoundedTime(roundStep());
       el('endTime').value = now;

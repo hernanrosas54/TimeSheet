@@ -44,6 +44,13 @@ const { context, get, calls, check, failures, tick } = env;
   get('endTime').dispatch('change');
   check('preview de duracion', /1 h 35 min/.test(get('durationPreview').textContent), get('durationPreview').textContent);
 
+  // 3b) Boton "Ahora" junto a la hora de inicio (redondeada al paso de 10 min).
+  const expectedNow = env.evalIn('Core.currentRoundedTime(10)');
+  get('startTime').value = '';
+  get('btnStartNow').dispatch('click');
+  check('boton Ahora rellena la hora de inicio', get('startTime').value === expectedNow, get('startTime').value + ' != ' + expectedNow);
+  check('hora del boton redondeada a 10 min', /^([01]\d|2[0-3]):[0-5]0$/.test(get('startTime').value), get('startTime').value);
+
   // 4) Guardado correcto.
   const before = calls.length;
   get('projectInput').value = '15';
@@ -106,7 +113,33 @@ const { context, get, calls, check, failures, tick } = env;
   check('horas del mes', /1 h 30 min/.test(tableHtml), tableHtml.slice(0, 400));
   check('horas del mes anterior sin datos', /—/.test(tableHtml), tableHtml.slice(0, 400));
   check('horas del año', /5 h</.test(tableHtml), tableHtml.slice(0, 400));
-  check('contador de filas', /1/.test(get('tableCount').textContent), get('tableCount').textContent);
+  check('contador de filas', /3 de 3/.test(get('tableCount').textContent), get('tableCount').textContent);
+
+  // 6b) Encabezados ordenables de las columnas de horas.
+  const sortButtons = (tableHtml.match(/data-action="sort"/g) || []).length;
+  check('tres encabezados ordenables', sortButtons === 3, String(sortButtons));
+  check('etiquetas cortas de horas', /Horas Mes</.test(tableHtml) && /Horas Mes Anterior</.test(tableHtml) && /Horas Año</.test(tableHtml), tableHtml.slice(0, 500));
+  check('flecha neutra antes de ordenar', /th-sort-arrow">⇅</.test(tableHtml) && !/is-active/.test(tableHtml), tableHtml.slice(0, 500));
+
+  context.TablesPage.sortBy('minutosMes');
+  let sortedHtml = get('tableHost').innerHTML;
+  check('primer clic ordena descendente', /th-sort is-active"[^>]*data-field="minutosMes"/.test(sortedHtml) && /th-sort-arrow">▼</.test(sortedHtml), sortedHtml.slice(0, 600));
+  check('mayor tiempo primero', sortedHtml.indexOf('App móvil') < sortedHtml.indexOf('Sitio web') && sortedHtml.indexOf('Sitio web') < sortedHtml.indexOf('Soporte'), sortedHtml.slice(0, 800));
+
+  context.TablesPage.sortBy('minutosMes');
+  sortedHtml = get('tableHost').innerHTML;
+  check('segundo clic ordena ascendente', /th-sort-arrow">▲</.test(sortedHtml) && sortedHtml.indexOf('Soporte') < sortedHtml.indexOf('Sitio web') && sortedHtml.indexOf('Sitio web') < sortedHtml.indexOf('App móvil'), sortedHtml.slice(0, 800));
+
+  context.TablesPage.sortBy('minutosMes');
+  sortedHtml = get('tableHost').innerHTML;
+  check('tercer clic quita el orden', /th-sort-arrow">⇅</.test(sortedHtml) && !/is-active/.test(sortedHtml) && sortedHtml.indexOf('Sitio web') < sortedHtml.indexOf('App móvil'), sortedHtml.slice(0, 800));
+
+  context.TablesPage.sortBy('minutosAnio');
+  sortedHtml = get('tableHost').innerHTML;
+  check('el boton activo es Horas Año', /th-sort is-active"[^>]*data-field="minutosAnio"/.test(sortedHtml) && /th-sort-arrow">▼</.test(sortedHtml), sortedHtml.slice(0, 700));
+  check('año: mayor tiempo primero', sortedHtml.indexOf('App móvil') < sortedHtml.indexOf('Sitio web') && sortedHtml.indexOf('Sitio web') < sortedHtml.indexOf('Soporte'), sortedHtml.slice(0, 800));
+  context.TablesPage.sortBy('minutosAnio');
+  context.TablesPage.sortBy('minutosAnio');
 
   // 7) Entradas: filtros y listado.
   env.evalIn('Core.navigate("entries")');

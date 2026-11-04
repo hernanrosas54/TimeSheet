@@ -221,7 +221,6 @@ function apiForgetIdentity() {
   });
 }
 
-/** Esquemas simplificados para construir formularios en el cliente. */
 /** Nombres de los meses en español para las etiquetas de periodo. */
 var MONTH_NAMES_ES_ = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -287,6 +286,7 @@ function getProjectMinutesSummary_() {
 }
 
 /** Esquema de las tablas tal como lo consume el cliente (incluye columnas calculadas). */
+/** Esquemas simplificados para construir formularios y tablas en el cliente. */
 function buildClientSchemas_() {
   var result = {};
   var periods = comparisonPeriods_();
@@ -304,6 +304,7 @@ function buildClientSchemas_() {
         required: !!column.required,
         readOnlyOnEdit: !!column.readOnlyOnEdit,
         computed: false,
+        sortable: false,
         title: column.label,
         hint: column.hint || ''
       };
@@ -320,6 +321,7 @@ function buildClientSchemas_() {
         required: false,
         readOnlyOnEdit: true,
         computed: true,
+        sortable: true,
         title: computedColumnTitle_(column.field, periods),
         hint: ''
       });

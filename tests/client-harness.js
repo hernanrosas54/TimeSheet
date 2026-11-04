@@ -103,14 +103,14 @@ function bootstrapData() {
         name: 'Proyectos', key: 'numero', autoKey: true, labelField: 'nombre',
         computedFields: ['minutosMes', 'minutosMesAnterior', 'minutosAnio'],
         columns: [
-          { field: 'numero', label: 'Numero', type: 'text', input: 'text', required: true, readOnlyOnEdit: true, hint: '' },
-          { field: 'nombre', label: 'Nombre', type: 'text', input: 'text', required: true, readOnlyOnEdit: false, hint: '' },
-          { field: 'numeroCliente', label: 'Numero Cliente', type: 'text', input: 'select', options: 'clients', required: false, readOnlyOnEdit: false, hint: '' },
-          { field: 'activo', label: 'Activo', type: 'boolean', input: 'checkbox', required: false, readOnlyOnEdit: false, hint: '' },
-          { field: 'fechaCreacion', label: 'Fecha Creacion', type: 'text', input: 'date', required: false, readOnlyOnEdit: false, hint: '' },
-          { field: 'minutosMes', label: 'Horas dedicadas en el mes', type: 'number', input: 'none', computed: true, title: 'Horas dedicadas en noviembre 2026' },
-          { field: 'minutosMesAnterior', label: 'Horas dedicadas en el mes anterior', type: 'number', input: 'none', computed: true, title: 'Horas dedicadas en octubre 2026' },
-          { field: 'minutosAnio', label: 'Horas dedicadas en el año', type: 'number', input: 'none', computed: true, title: 'Horas dedicadas en el año 2026' }
+          { field: 'numero', label: 'Numero', type: 'text', input: 'text', required: true, readOnlyOnEdit: true, computed: false, sortable: false, hint: '' },
+          { field: 'nombre', label: 'Nombre', type: 'text', input: 'text', required: true, readOnlyOnEdit: false, computed: false, sortable: false, hint: '' },
+          { field: 'numeroCliente', label: 'Numero Cliente', type: 'text', input: 'select', options: 'clients', required: false, readOnlyOnEdit: false, computed: false, sortable: false, hint: '' },
+          { field: 'activo', label: 'Activo', type: 'boolean', input: 'checkbox', required: false, readOnlyOnEdit: false, computed: false, sortable: false, hint: '' },
+          { field: 'fechaCreacion', label: 'Fecha Creacion', type: 'text', input: 'date', required: false, readOnlyOnEdit: false, computed: false, sortable: false, hint: '' },
+          { field: 'minutosMes', label: 'Horas Mes', type: 'number', input: 'none', computed: true, sortable: true, readOnlyOnEdit: true, title: 'Horas dedicadas en noviembre 2026' },
+          { field: 'minutosMesAnterior', label: 'Horas Mes Anterior', type: 'number', input: 'none', computed: true, sortable: true, readOnlyOnEdit: true, title: 'Horas dedicadas en octubre 2026' },
+          { field: 'minutosAnio', label: 'Horas Año', type: 'number', input: 'none', computed: true, sortable: true, readOnlyOnEdit: true, title: 'Horas dedicadas en el año 2026' }
         ]
       }
     },
@@ -147,7 +147,11 @@ const backend = {
       data: {
         table: table,
         schema: bootstrapData().schemas.Proyectos,
-        rows: [{ _row: 2, numero: '15', nombre: 'Sitio web', numeroCliente: '1', clienteNombre: 'Acme', activo: true, fechaCreacion: '2026-01-05', minutosMes: 90, minutosMesAnterior: 0, minutosAnio: 300 }],
+        rows: [
+          { _row: 2, numero: '15', nombre: 'Sitio web', numeroCliente: '1', clienteNombre: 'Acme', activo: true, fechaCreacion: '2026-01-05', minutosMes: 90, minutosMesAnterior: 0, minutosAnio: 300 },
+          { _row: 3, numero: '7', nombre: 'App móvil', numeroCliente: '1', clienteNombre: 'Acme', activo: true, fechaCreacion: '2026-02-10', minutosMes: 240, minutosMesAnterior: 30, minutosAnio: 600 },
+          { _row: 4, numero: '9', nombre: 'Soporte', numeroCliente: '0', clienteNombre: '', activo: false, fechaCreacion: '2026-03-01', minutosMes: 0, minutosMesAnterior: 15, minutosAnio: 45 }
+        ],
         clients: [{ numero: '1', nombre: 'Acme' }]
       }
     };

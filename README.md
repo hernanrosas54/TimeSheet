@@ -8,8 +8,12 @@ Usuarios y Tipos de Actividad).
 ## Características
 
 - **Registro de horas** por día, con vista previa de duración, totales y filtros.
+  El botón **Ahora** junto a *Hora inicio* (y a *Hora fin*) rellena la hora actual
+  redondeada al paso configurado.
 - **Proyectos** con las horas dedicadas en el mes, en el mes anterior y en el año,
-  calculadas desde la hoja `Tiempos` (no se almacenan).
+  calculadas desde la hoja `Tiempos` (no se almacenan). Los encabezados
+  **Horas Mes**, **Horas Mes Anterior** y **Horas Año** se ordenan al hacer clic:
+  primer clic de mayor a menor, segundo de menor a mayor y tercero quita el orden.
 - **Edición de tablas** mediante el enlace del nombre; las columnas calculadas
   nunca se envían al servidor.
 - **Datos en Google Sheets**: el script crea la hoja `Control de Tiempo` con las
@@ -41,7 +45,7 @@ Usuarios y Tipos de Actividad).
 
 ```powershell
 clasp -u hrosas push -f                         # sube los 14 archivos del proyecto
-node tests/client.smoke.js                      # 50 comprobaciones del cliente
+node tests/client.smoke.js                      # 61 comprobaciones del cliente
 ```
 
 Tras el push, ejecutar `setupTimeSheet` una vez en el editor de Apps Script y

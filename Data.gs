@@ -85,9 +85,9 @@ var SCHEMA = {
  */
 var COMPUTED_COLUMNS = {
   Proyectos: [
-    { field: 'minutosMes', label: 'Horas dedicadas en el mes', type: 'number', width: 160 },
-    { field: 'minutosMesAnterior', label: 'Horas dedicadas en el mes anterior', type: 'number', width: 190 },
-    { field: 'minutosAnio', label: 'Horas dedicadas en el año', type: 'number', width: 160 }
+    { field: 'minutosMes', label: 'Horas Mes', type: 'number' },
+    { field: 'minutosMesAnterior', label: 'Horas Mes Anterior', type: 'number' },
+    { field: 'minutosAnio', label: 'Horas Año', type: 'number' }
   ]
 };
 

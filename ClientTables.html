@@ -8,6 +8,7 @@ window.TablesPage = (function () {
     table: '',
     rows: [],
     search: '',
+    sort: { field: '', dir: 0 },
     clients: [],
     entries: [],
     filtersReady: false,
@@ -22,6 +23,7 @@ window.TablesPage = (function () {
   async function showTable(name) {
     state.table = name;
     state.search = '';
+    state.sort = { field: '', dir: 0 };
     el('tableSearch').value = '';
     el('tableSearch').placeholder = 'Buscar en ' + name.toLowerCase() + '…';
     el('tableHint').textContent = hintFor(name);
@@ -30,7 +32,7 @@ window.TablesPage = (function () {
 
   function hintFor(name) {
     if (name === 'Proyectos') {
-      return 'Haz clic en el nombre para editar el proyecto. El número se asigna automáticamente si lo dejas vacío y el número de cliente en 0 indica que no tiene empresa asociada. Las horas se calculan desde la hoja Tiempos; los demás datos también puedes editarlos directamente en la hoja de cálculo.';
+      return 'Haz clic en el nombre para editar el proyecto. El número se asigna automáticamente si lo dejas vacío y el número de cliente en 0 indica que no tiene empresa asociada. Haz clic en los encabezados de Horas Mes, Horas Mes Anterior u Horas Año para ordenar de mayor a menor y ver qué proyectos consumen más tiempo. Las horas se calculan desde la hoja Tiempos.';
     }
     if (name === 'Clientes') {
       return 'Haz clic en el nombre para editar el cliente. El número se asigna automáticamente si lo dejas vacío.';
@@ -82,6 +84,38 @@ window.TablesPage = (function () {
     });
   }
 
+  /** Flecha de cada estado de orden: descendente, ascendente y sin orden. */
+  const SORT_ARROWS = { '-1': '▼', '1': '▲', '0': '⇅' };
+
+  /** Aplica el orden elegido sobre las columnas calculadas de horas. */
+  function sortedRows(rows) {
+    const field = state.sort.field;
+    const dir = state.sort.dir;
+    if (!field || !dir) return rows;
+    return rows.slice().sort(function (a, b) {
+      const left = Number(a[field]) || 0;
+      const right = Number(b[field]) || 0;
+      if (left === right) return 0;
+      return (left - right) * dir;
+    });
+  }
+
+  /**
+   * Ordena por una columna calculada: el primer clic ordena de mayor a menor,
+   * el segundo de menor a mayor y el tercero devuelve el orden original.
+   */
+  function sortBy(field) {
+    if (!field) return;
+    if (state.sort.field !== field) {
+      state.sort = { field: field, dir: -1 };
+    } else if (state.sort.dir === -1) {
+      state.sort = { field: field, dir: 1 };
+    } else {
+      state.sort = { field: '', dir: 0 };
+    }
+    renderTable();
+  }
+
   /** En las tablas con editor el nombre del registro es el enlace de edición. */
   function isLabelColumn(column) {
     const schema = Core.state.schemas[state.table];
@@ -128,10 +162,32 @@ window.TablesPage = (function () {
       Core.escapeHtml(text) + '</span>';
   }
 
+  /** Encabezado de una columna; las calculadas llevan botón para ordenar. */
+  function headerCell(column) {
+    const title = column.title ? ' title="' + Core.escapeHtml(column.title) + '"' : '';
+
+    if (!column.sortable) {
+      return '<th' + title + '>' + Core.escapeHtml(column.label) + '</th>';
+    }
+
+    const dir = state.sort.field === column.field ? state.sort.dir : 0;
+    const arrow = SORT_ARROWS[String(dir)] || SORT_ARROWS['0'];
+    const active = dir ? ' is-active' : '';
+    const hint = dir === -1 ? 'Ordenado de mayor a menor (clic para invertir)'
+      : dir === 1 ? 'Ordenado de menor a mayor (clic para quitar el orden)'
+      : 'Ordenar de mayor a menor';
+
+    return '<th class="th-num"' + title + '>' +
+      '<button type="button" class="th-sort' + active + '" data-action="sort" data-field="' +
+        Core.escapeHtml(column.field) + '" title="' + Core.escapeHtml(hint) + '">' +
+        Core.escapeHtml(column.label) + '<span class="th-sort-arrow">' + arrow + '</span>' +
+      '</button></th>';
+  }
+
   function renderTable() {
     const schema = Core.state.schemas[state.table];
     const host = el('tableHost');
-    const rows = filteredRows();
+    const rows = sortedRows(filteredRows());
 
     if (!schema) {
       host.innerHTML = '<div class="p-8 text-center text-sm text-slate-500">Tabla no disponible.</div>';
@@ -148,15 +204,12 @@ window.TablesPage = (function () {
       return;
     }
 
-    const header = schema.columns.map(function (column) {
-      const title = column.title ? ' title="' + Core.escapeHtml(column.title) + '"' : '';
-      const style = column.computed ? ' style="text-align:right"' : '';
-      return '<th' + style + title + '>' + Core.escapeHtml(column.label) + '</th>';
-    }).join('');
+    const header = schema.columns.map(headerCell).join('');
 
     const body = rows.map(function (row) {
       const cells = schema.columns.map(function (column) {
-        return '<td>' + cellValue(row, column) + '</td>';
+        const cellClass = column.computed ? ' class="num"' : '';
+        return '<td' + cellClass + '>' + cellValue(row, column) + '</td>';
       }).join('');
       return '<tr>' + cells + '</tr>';
     }).join('');
@@ -171,6 +224,12 @@ window.TablesPage = (function () {
           return item._row === rowNumber;
         })[0];
         openEditor(row || null);
+      });
+    });
+
+    host.querySelectorAll('[data-action="sort"]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        sortBy(button.dataset.field);
       });
     });
   }
@@ -509,6 +568,7 @@ window.TablesPage = (function () {
     showEntries: showEntries,
     loadEntries: loadEntries,
     openEditor: openEditor,
+    sortBy: sortBy,
     state: state
   };
 })();

@@ -288,6 +288,42 @@
     outline: none;
   }
 
+  /* Encabezados de columnas calculadas: se ordenan al hacer clic */
+  .th-num {
+    text-align: right;
+  }
+
+  .th-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .th-sort:hover,
+  .th-sort:focus,
+  .th-sort.is-active {
+    color: var(--brand);
+    outline: none;
+  }
+
+  .th-sort-arrow {
+    font-size: 0.7rem;
+    opacity: 0.5;
+  }
+
+  .th-sort.is-active .th-sort-arrow {
+    opacity: 1;
+  }
+
   /* ------------------------------------------------ Modales y avisos */
   .modal-backdrop {
     position: fixed;
