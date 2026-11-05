@@ -245,6 +245,65 @@ const { context, get, calls, check, failures, tick } = env;
   context.TablesPage.sortBy('minutosAnio');
   context.TablesPage.sortBy('minutosAnio');
 
+  // 6c) Drill down: la flecha junto al numero abre el detalle del proyecto.
+  const drillHtml = get('tableHost').innerHTML;
+  check('flecha de detalle junto al numero',
+    /data-action="detail"[^>]*data-project="15"/.test(drillHtml) && /▾/.test(drillHtml) && /btn-icon/.test(drillHtml),
+    drillHtml.slice(0, 360));
+
+  const beforeDetail = calls.length;
+  await context.TablesPage.openProjectDetail('15', 1);
+  const detailPanel = get('modalRoot').querySelector('.modal-panel');
+  const detailHost = detailPanel.querySelector('#detailHost');
+  let detailHtml = detailHost.innerHTML;
+  const detailCall = calls.slice(beforeDetail).find((c) => c[0] === 'apiProjectDetail');
+
+  check('detalle pide el proyecto al servidor',
+    !!detailCall && detailCall[1][0] === '15' && detailCall[1][1] === 1,
+    detailCall ? JSON.stringify(detailCall[1]) : 'sin llamada');
+  check('panel ancho para el detalle', detailPanel.classList.contains('modal-wide'));
+  check('encabezado con los cuatro totales y el detalle',
+    /Proyecto</.test(detailHtml) && /Horas en el mes</.test(detailHtml) &&
+    /Horas en el mes anterior</.test(detailHtml) && /Horas en el año</.test(detailHtml) &&
+    /Detalle</.test(detailHtml),
+    detailHtml.slice(0, 420));
+  check('proyecto con numero, nombre y periodo',
+    /15 · Sitio web/.test(detailHtml) && /noviembre 2026/.test(detailHtml) &&
+    /1 h 30 min/.test(detailHtml) && /5 h</.test(detailHtml),
+    detailHtml.slice(0, 520));
+  check('detalle agrupa por mes empezando por el actual',
+    /Noviembre 2026/.test(detailHtml) && detailHtml.indexOf('Noviembre 2026') < detailHtml.indexOf('Primera del mes'),
+    detailHtml.slice(0, 760));
+  check('filas del detalle del dia 1 en adelante',
+    detailHtml.indexOf('<td class="whitespace-nowrap">01/11/2026</td>') !== -1 &&
+    detailHtml.indexOf('<td class="whitespace-nowrap">01/11/2026</td>') <
+      detailHtml.indexOf('<td class="whitespace-nowrap">02/11/2026</td>') &&
+    /Hora inicio</.test(detailHtml) && /Hora fin</.test(detailHtml) && /Observaciones</.test(detailHtml),
+    detailHtml.slice(-700));
+  check('detalle paginado de 100 en 100',
+    /Página 1 de 2/.test(detailHtml) && /100 por página/.test(detailHtml) &&
+    /data-detail-page="2"/.test(detailHtml) && /data-detail-page="0" disabled>‹ Anterior</.test(detailHtml),
+    detailHtml.slice(-420));
+
+  await context.TablesPage.loadProjectDetail(detailPanel, '15', 2);
+  detailHtml = detailHost.innerHTML;
+  check('detalle pide la pagina siguiente',
+    calls.slice(beforeDetail).some((c) => c[0] === 'apiProjectDetail' && c[1][1] === 2),
+    JSON.stringify(calls.slice(beforeDetail).map((c) => c[1])));
+  check('segunda pagina del detalle',
+    /Octubre 2026/.test(detailHtml) && /Página 2 de 2/.test(detailHtml) &&
+    /De octubre/.test(detailHtml) && /05\/10\/2026/.test(detailHtml),
+    detailHtml.slice(0, 620));
+  env.evalIn('Core.closeModal()');
+
+  await context.TablesPage.openProjectDetail('9', 1);
+  const vacioHost = get('modalRoot').querySelector('.modal-panel').querySelector('#detailHost');
+  check('detalle sin registros muestra aviso',
+    /todavía no tiene registros/.test(vacioHost.innerHTML),
+    vacioHost.innerHTML.slice(0, 320));
+  env.evalIn('Core.closeModal()');
+  await tick(40);
+
   // 7) Entradas: filtros y listado.
   env.evalIn('Core.navigate("entries")');
   await tick(120);

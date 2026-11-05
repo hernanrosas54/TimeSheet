@@ -28,7 +28,9 @@ var CONFIG = {
   // Máximo de registros devueltos en los listados.
   LIMITS: {
     ENTRIES: 300,
-    TABLE_ROWS: 2000
+    TABLE_ROWS: 2000,
+    // Registros por página en el detalle de un proyecto (drill down).
+    DETAIL_PAGE: 100
   },
 
   // Nombres de las hojas.

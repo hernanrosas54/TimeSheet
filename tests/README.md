@@ -27,7 +27,11 @@ Comprueba, entre otras cosas:
   diálogo con validación de campos obligatorios.
 - Orden de las columnas calculadas de Proyectos: primer clic descendente, segundo
   ascendente y tercero quita el orden.
+- Drill down de Proyectos: la flecha ▾ junto al número abre el detalle con las
+  horas del mes, del mes anterior y del año, los registros agrupados por mes
+  (del actual hacia el pasado, con el día 1 primero) y la paginación de 100 en
+  100, incluido el aviso cuando un proyecto no tiene registros.
 - Listado de registros de tiempo con filtros y cambio de usuario.
 
-Salida esperada: `Todas las comprobaciones pasaron.` (96 comprobaciones) y código
+Salida esperada: `Todas las comprobaciones pasaron.` (107 comprobaciones) y código
 de salida 0.

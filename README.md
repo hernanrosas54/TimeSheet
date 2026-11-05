@@ -22,6 +22,12 @@ Usuarios y Tipos de Actividad).
   calculadas desde la hoja `Tiempos` (no se almacenan). Los encabezados
   **Horas Mes**, **Horas Mes Anterior** y **Horas Año** se ordenan al hacer clic:
   primer clic de mayor a menor, segundo de menor a mayor y tercero quita el orden.
+- **Detalle del proyecto (drill down)**: la flecha **▾** junto al número abre una
+  vista con las horas del mes en curso, del mes anterior y del año, y los
+  registros agrupados por mes (del actual hacia el pasado, del día 1 en
+  adelante). Cada fila muestra fecha, hora de inicio, hora de finalización,
+  tiempo, tipo de actividad, actividad y observaciones. El detalle se pagina de
+  100 en 100 y avisa cuando un mes queda repartido entre dos páginas.
 - **Edición de tablas** mediante el enlace del nombre; las columnas calculadas
   nunca se envían al servidor.
 - **Datos en Google Sheets**: el script crea la hoja `Control de Tiempo` con las
@@ -37,14 +43,14 @@ Usuarios y Tipos de Actividad).
 | `Utils.gs` | Utilidades de fechas, texto y minutos. |
 | `Auth.gs` | Identificación del usuario por correo. |
 | `Data.gs` | Lectura/escritura de hojas y saneamiento de filas. |
-| `Api.gs` | API expuesta a `google.script.run` (listados, guardado, totales). |
+| `Api.gs` | API expuesta a `google.script.run` (listados, guardado, totales y detalle por proyecto). |
 | `Setup.gs` | Siembra inicial de la hoja y validaciones. |
 | `Index.html` | Marcado principal y favicon (data URI). |
 | `Styles.html` | Estilos (Tailwind + clases propias como `.link-cell`). |
 | `ClientCore.html` | Estado, utilidades y mensajes del cliente. |
 | `ClientApp.html` | Arranque, identificación, pestañas y catálogos. |
 | `ClientTime.html` | Registro de horas del día. |
-| `ClientTables.html` | Listado y edición de las tablas maestras. |
+| `ClientTables.html` | Listado y edición de las tablas maestras y detalle (drill down) de proyectos. |
 | `tests/` | Pruebas del cliente en Node (`node tests/client.smoke.js`). |
 | `assets/favicon.svg` | Fuente editable del icono (no se sube a Apps Script). |
 | `DEPLOY.md` | Vinculación con clasp, despliegue y notas de favicon. |
@@ -53,7 +59,7 @@ Usuarios y Tipos de Actividad).
 
 ```powershell
 clasp -u hrosas push -f                         # sube los 14 archivos del proyecto
-node tests/client.smoke.js                      # 96 comprobaciones del cliente
+node tests/client.smoke.js                      # 107 comprobaciones del cliente
 ```
 
 Tras el push, ejecutar `setupTimeSheet` una vez en el editor de Apps Script y

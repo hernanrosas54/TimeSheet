@@ -32,7 +32,7 @@ window.TablesPage = (function () {
 
   function hintFor(name) {
     if (name === 'Proyectos') {
-      return 'Haz clic en el nombre para editar el proyecto. El número se asigna automáticamente si lo dejas vacío y el número de cliente en 0 indica que no tiene empresa asociada. Haz clic en los encabezados de Horas Mes, Horas Mes Anterior u Horas Año para ordenar de mayor a menor y ver qué proyectos consumen más tiempo. Las horas se calculan desde la hoja Tiempos.';
+      return 'Haz clic en el nombre para editar el proyecto. El número se asigna automáticamente si lo dejas vacío y el número de cliente en 0 indica que no tiene empresa asociada. La flecha ▾ junto al número abre el detalle de horas del proyecto mes por mes. Haz clic en los encabezados de Horas Mes, Horas Mes Anterior u Horas Año para ordenar de mayor a menor y ver qué proyectos consumen más tiempo. Las horas se calculan desde la hoja Tiempos.';
     }
     if (name === 'Clientes') {
       return 'Haz clic en el nombre para editar el cliente. El número se asigna automáticamente si lo dejas vacío.';
@@ -125,6 +125,18 @@ window.TablesPage = (function () {
 
   function cellValue(row, column) {
     const value = row[column.field];
+
+    // En Proyectos la flecha junto al número abre el detalle (drill down) del proyecto.
+    if (state.table === 'Proyectos' && column.field === 'numero' && row.numero) {
+      const numero = String(row.numero);
+      const nombre = String(row.nombre == null ? '' : row.nombre);
+      return '<span class="flex items-center gap-1.5">' +
+        '<button type="button" class="btn btn-ghost btn-icon" data-action="detail" data-project="' +
+          Core.escapeHtml(numero) + '" title="Ver el detalle de horas de ' + Core.escapeHtml(numero + ' · ' + nombre) +
+          '" aria-label="Ver el detalle de horas del proyecto ' + Core.escapeHtml(numero) + '">▾</button>' +
+        '<span class="num">' + Core.escapeHtml(numero) + '</span>' +
+      '</span>';
+    }
 
     if (column.computed) {
       const minutes = Number(value) || 0;
@@ -232,8 +244,204 @@ window.TablesPage = (function () {
         sortBy(button.dataset.field);
       });
     });
+
+    host.querySelectorAll('[data-action="detail"]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        openProjectDetail(button.dataset.project, 1);
+      });
+    });
   }
 
+
+  /* ------------------------------------------------------------ Detalle del proyecto */
+
+  /** Celda de horas del encabezado: valor y periodo al que corresponde. */
+  function detailHorasCell(minutos, periodo) {
+    return '<td class="num whitespace-nowrap">' + Core.escapeHtml(Core.formatMinutes(minutos)) +
+      '<br><span class="text-[11px] font-normal text-slate-500">' + Core.escapeHtml(periodo || '') +
+      '</span></td>';
+  }
+
+  /**
+   * Encabezado del detalle: proyecto (número y nombre) con las horas del mes en
+   * curso, del mes anterior y del año, más un resumen de los registros.
+   */
+  function detailSummaryHtml(data) {
+    const proyecto = data.proyecto || {};
+    const totals = data.totals || {};
+    const periods = data.periods || {};
+    const rango = data.rango || {};
+    const numero = String(proyecto.numero == null ? '' : proyecto.numero);
+    const nombre = String(proyecto.nombre == null ? '' : proyecto.nombre);
+    const count = Number(totals.count) || 0;
+    const detalle = count + ' registro' + (count === 1 ? '' : 's') +
+      (rango.desde
+        ? ' · ' + Core.formatDateEs(rango.desde) + ' a ' + Core.formatDateEs(rango.hasta)
+        : '');
+
+    return '<div class="overflow-x-auto rounded-xl border border-slate-200">' +
+      '<table class="data"><thead><tr>' +
+        '<th>Proyecto</th>' +
+        '<th class="th-num">Horas en el mes</th>' +
+        '<th class="th-num">Horas en el mes anterior</th>' +
+        '<th class="th-num">Horas en el año</th>' +
+        '<th>Detalle</th>' +
+      '</tr></thead><tbody><tr>' +
+        '<td class="whitespace-nowrap">' +
+          '<span class="font-semibold text-slate-900">' +
+            Core.escapeHtml(numero ? numero + ' · ' + nombre : nombre) + '</span>' +
+          (proyecto.cliente
+            ? '<br><span class="text-[11px] text-slate-500">Cliente: ' +
+              Core.escapeHtml(proyecto.cliente) + '</span>'
+            : '') +
+          (proyecto.activo === false
+            ? '<br><span class="text-[11px] font-semibold text-rose-600">Proyecto inactivo</span>'
+            : '') +
+        '</td>' +
+        detailHorasCell(totals.minutosMes, periods.monthLabel) +
+        detailHorasCell(totals.minutosMesAnterior, periods.previousMonthLabel) +
+        detailHorasCell(totals.minutosAnio, periods.yearLabel) +
+        '<td class="text-xs text-slate-600">' + Core.escapeHtml(detalle) + '</td>' +
+      '</tr></tbody></table>' +
+    '</div>';
+  }
+
+  /**
+   * Registros agrupados por mes: el mes en curso primero y luego hacia el
+   * pasado; dentro de cada mes las filas llegan del día 1 en adelante.
+   */
+  function detailMonthsHtml(data) {
+    const months = data.months || [];
+
+    if (!months.length) {
+      return '<p class="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 ' +
+        'text-center text-sm text-slate-500">Este proyecto todavía no tiene registros de tiempo.</p>';
+    }
+
+    const body = months.map(function (group) {
+      const pageCount = Number(group.count) || 0;
+      const monthCount = Number(group.monthCount) || pageCount;
+      const monthMinutos = group.monthMinutos == null ? group.totalMinutos : group.monthMinutos;
+      const parcial = monthCount > pageCount;
+
+      const cabecera = '<tr class="detail-month"><td colspan="7">' + Core.escapeHtml(group.label) +
+        '<span class="detail-month-meta">' + monthCount + ' registro' + (monthCount === 1 ? '' : 's') +
+          ' · ' + Core.formatMinutes(monthMinutos) + '</span>' +
+        (parcial
+          ? '<span class="detail-month-meta">en esta página: ' + pageCount + '</span>'
+          : '') +
+      '</td></tr>';
+
+      const filas = (group.entries || []).map(function (entry) {
+        return '<tr>' +
+          '<td class="whitespace-nowrap">' + Core.escapeHtml(Core.formatDateEs(entry.fecha)) + '</td>' +
+          '<td class="whitespace-nowrap">' + Core.escapeHtml(entry.horaInicio) + '</td>' +
+          '<td class="whitespace-nowrap">' + Core.escapeHtml(entry.horaFin) + '</td>' +
+          '<td class="num whitespace-nowrap">' +
+            Core.escapeHtml(Core.formatMinutes(entry.minutos)) + '</td>' +
+          '<td>' + Core.escapeHtml(entry.tipoActividad) + '</td>' +
+          '<td>' + Core.escapeHtml(entry.actividad) + '</td>' +
+          '<td class="text-slate-500">' + Core.escapeHtml(entry.observaciones || '—') + '</td>' +
+        '</tr>';
+      }).join('');
+
+      return cabecera + filas;
+    }).join('');
+
+    return '<div class="mt-4 overflow-auto rounded-xl border border-slate-200" style="max-height: 55vh">' +
+      '<table class="data detail-table"><thead><tr>' +
+        '<th>Fecha</th>' +
+        '<th>Hora inicio</th>' +
+        '<th>Hora fin</th>' +
+        '<th class="th-num">Tiempo</th>' +
+        '<th>Tipo de actividad</th>' +
+        '<th>Actividad</th>' +
+        '<th>Observaciones</th>' +
+      '</tr></thead><tbody>' + body + '</tbody></table>' +
+    '</div>';
+  }
+
+  /** Pie del detalle con la paginación de 100 registros por página. */
+  function detailPagerHtml(data) {
+    const page = Number(data.page) || 1;
+    const pageCount = Number(data.pageCount) || 1;
+    const count = Number((data.totals || {}).count) || 0;
+    const pageSize = Number(data.pageSize) || 100;
+    const rango = pageCount > 1
+      ? ' · ' + ((page - 1) * pageSize + 1) + '–' + Math.min(page * pageSize, count)
+      : '';
+
+    return '<div class="mt-3 flex flex-wrap items-center justify-between gap-2">' +
+      '<p class="text-xs text-slate-500">Página ' + page + ' de ' + pageCount + rango +
+        ' · ' + count + ' registro' + (count === 1 ? '' : 's') +
+        ' · ' + pageSize + ' por página</p>' +
+      '<div class="flex items-center gap-2">' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-detail-page="' + (page - 1) + '"' +
+          (page <= 1 ? ' disabled' : '') + '>‹ Anterior</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-detail-page="' + (page + 1) + '"' +
+          (page >= pageCount ? ' disabled' : '') + '>Siguiente ›</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function detailHtml(data) {
+    return detailSummaryHtml(data) + detailMonthsHtml(data) + detailPagerHtml(data);
+  }
+
+  /** Abre el drill down de un proyecto (flecha ▾ de la lista de Proyectos). */
+  async function openProjectDetail(numero, page) {
+    const target = String(numero == null ? '' : numero).trim();
+    if (!target) return;
+
+    const panel = Core.openModal(
+      '<div class="p-4 sm:p-5">' +
+        '<div class="flex items-start justify-between gap-3">' +
+          '<div>' +
+            '<h3 class="text-base font-semibold text-slate-900">Detalle del proyecto</h3>' +
+            '<p class="mt-0.5 text-xs text-slate-500">Horas por mes, empezando por el mes en ' +
+              'curso. Usa la paginación para recorrer los registros anteriores.</p>' +
+          '</div>' +
+          '<button type="button" data-action="cancel" aria-label="Cerrar" ' +
+            'class="-mr-1 -mt-1 rounded-lg px-2 text-xl leading-none text-slate-400 ' +
+            'hover:text-slate-700">×</button>' +
+        '</div>' +
+        '<div id="detailHost" class="mt-4">' +
+          '<div class="p-8 text-center text-sm text-slate-500">Cargando…</div>' +
+        '</div>' +
+      '</div>'
+    );
+
+    panel.classList.add('modal-wide');
+    panel.querySelectorAll('[data-action="cancel"]').forEach(function (button) {
+      button.addEventListener('click', Core.closeModal);
+    });
+
+    await loadProjectDetail(panel, target, page || 1);
+  }
+
+  /** Carga (o cambia de página) el detalle del proyecto en el modal abierto. */
+  async function loadProjectDetail(panel, numero, page) {
+    const host = panel.querySelector('#detailHost');
+    if (!host) return;
+
+    host.innerHTML = '<div class="p-8 text-center text-sm text-slate-500">Cargando…</div>';
+
+    try {
+      const data = await Core.call('apiProjectDetail', numero, Math.max(1, Number(page) || 1));
+      host.innerHTML = detailHtml(data);
+      panel.scrollTop = 0;
+
+      host.querySelectorAll('[data-detail-page]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          if (button.disabled) return;
+          loadProjectDetail(panel, numero, Number(button.dataset.detailPage));
+        });
+      });
+    } catch (error) {
+      host.innerHTML = '<div class="p-6 text-center text-sm text-rose-600">' +
+        Core.escapeHtml(error.message) + '</div>';
+    }
+  }
 
   /* ------------------------------------------------------------ Editor */
   const SINGULAR = {
@@ -568,6 +776,8 @@ window.TablesPage = (function () {
     showEntries: showEntries,
     loadEntries: loadEntries,
     openEditor: openEditor,
+    openProjectDetail: openProjectDetail,
+    loadProjectDetail: loadProjectDetail,
     sortBy: sortBy,
     state: state
   };

@@ -557,6 +557,151 @@ function apiListEntries(filters) {
   });
 }
 
+/* ------------------------------------------------------------------ */
+/* Detalle de un proyecto (drill down)                                 */
+/* ------------------------------------------------------------------ */
+
+/** Etiqueta legible de un mes "AAAA-MM" (por ejemplo "Noviembre 2026"). */
+function monthLabel_(monthKey) {
+  var parts = String(monthKey || '').split('-');
+  var year = Number(parts[0]);
+  var month = Number(parts[1]);
+  if (!year || !month || month < 1 || month > 12) return String(monthKey || '');
+  var name = MONTH_NAMES_ES_[month - 1];
+  return name.charAt(0).toUpperCase() + name.slice(1) + ' ' + year;
+}
+
+/**
+ * Detalle de un proyecto para el drill down del listado de Proyectos.
+ *
+ * Devuelve los totales del mes en curso, del mes anterior y del año, y los
+ * registros agrupados por mes empezando por el actual y siguiendo hacia el
+ * pasado; dentro de cada mes las filas van del día 1 en adelante. La lista se
+ * entrega paginada en bloques de CONFIG.LIMITS.DETAIL_PAGE registros, así que
+ * un mes puede quedar repartido entre dos páginas (la cabecera del mes avisa
+ * cuántos registros tiene en total y cuántos van en la página).
+ */
+function apiProjectDetail(numero, page) {
+  return api_(function () {
+    requireUser_();
+
+    var target = String(numero == null ? '' : numero).trim();
+    assert_(target, 'Proyecto inválido.');
+
+    var projects = getProjectMap_();
+    var project = projects[target] || null;
+    assert_(project, 'El proyecto "' + target + '" no existe o fue eliminado.');
+
+    var periods = comparisonPeriods_();
+
+    var entries = readTable_(CONFIG.SHEETS.TIEMPOS)
+      .filter(function (row) {
+        return String(row.proyecto == null ? '' : row.proyecto).trim() === target;
+      })
+      .map(function (row) {
+        return decorateEntry_(row, projects);
+      })
+      .filter(function (entry) {
+        return isValidIsoDate_(entry.fecha);
+      });
+
+    // Totales del mes en curso, del mes anterior, del año y de toda la historia.
+    var minutosMes = 0;
+    var minutosMesAnterior = 0;
+    var minutosAnio = 0;
+    var totalMinutos = 0;
+    var fechaMin = '';
+    var fechaMax = '';
+    var monthTotals = {};
+
+    entries.forEach(function (entry) {
+      var minutos = Number(entry.minutos) || 0;
+      var monthKey = entry.fecha.slice(0, 7);
+
+      totalMinutos += minutos;
+      if (monthKey === periods.monthPrefix) minutosMes += minutos;
+      if (monthKey === periods.previousMonthPrefix) minutosMesAnterior += minutos;
+      if (entry.fecha.indexOf(periods.yearPrefix) === 0) minutosAnio += minutos;
+
+      if (!fechaMin || entry.fecha < fechaMin) fechaMin = entry.fecha;
+      if (!fechaMax || entry.fecha > fechaMax) fechaMax = entry.fecha;
+
+      if (!monthTotals[monthKey]) monthTotals[monthKey] = { count: 0, minutos: 0 };
+      monthTotals[monthKey].count += 1;
+      monthTotals[monthKey].minutos += minutos;
+    });
+
+    // Mes más reciente primero; dentro del mes, del día 1 en adelante.
+    entries.sort(function (a, b) {
+      var monthA = a.fecha.slice(0, 7);
+      var monthB = b.fecha.slice(0, 7);
+      if (monthA !== monthB) return monthA < monthB ? 1 : -1;
+      if (a.fecha !== b.fecha) return a.fecha < b.fecha ? -1 : 1;
+      if (a.horaInicio !== b.horaInicio) return a.horaInicio < b.horaInicio ? -1 : 1;
+      return a._row - b._row;
+    });
+
+    // Paginación sobre la lista completa (100 registros por página).
+    var pageSize = Math.max(1, Number(CONFIG.LIMITS.DETAIL_PAGE) || 100);
+    var pageCount = Math.max(1, Math.ceil(entries.length / pageSize));
+    var current = Math.min(Math.max(1, Number(page) || 1), pageCount);
+    var slice = entries.slice((current - 1) * pageSize, current * pageSize);
+
+    // Agrupación por mes solo de la página pedida.
+    var months = [];
+    var byMonth = {};
+
+    slice.forEach(function (entry) {
+      var monthKey = entry.fecha.slice(0, 7);
+      if (!byMonth[monthKey]) {
+        byMonth[monthKey] = {
+          monthKey: monthKey,
+          label: monthLabel_(monthKey),
+          entries: [],
+          count: 0,
+          totalMinutos: 0,
+          monthCount: (monthTotals[monthKey] || {}).count || 0,
+          monthMinutos: (monthTotals[monthKey] || {}).minutos || 0
+        };
+        months.push(byMonth[monthKey]);
+      }
+
+      var group = byMonth[monthKey];
+      group.entries.push(entry);
+      group.count += 1;
+      group.totalMinutos += Number(entry.minutos) || 0;
+    });
+
+    return {
+      proyecto: {
+        numero: project.numero,
+        nombre: project.nombre,
+        cliente: project.cliente || '',
+        activo: project.activo === true,
+        fechaCreacion: project.fechaCreacion || ''
+      },
+      periods: {
+        monthLabel: periods.monthLabel,
+        previousMonthLabel: periods.previousMonthLabel,
+        yearLabel: periods.yearLabel
+      },
+      totals: {
+        minutosMes: minutosMes,
+        minutosMesAnterior: minutosMesAnterior,
+        minutosAnio: minutosAnio,
+        totalMinutos: totalMinutos,
+        count: entries.length
+      },
+      rango: { desde: fechaMin, hasta: fechaMax },
+      page: current,
+      pageSize: pageSize,
+      pageCount: pageCount,
+      months: months
+    };
+  });
+}
+
+
 /** Elimina un registro de tiempo por número de fila. */
 function apiDeleteTimeEntry(rowNumber) {
   return api_(function () {

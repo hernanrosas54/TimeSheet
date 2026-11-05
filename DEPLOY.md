@@ -85,6 +85,10 @@ Todo debe salir `IGUAL`. Si alguno sale `DIFERENTE`, repetir
    (`apiDeleteTableRow`) sigue existiendo y valida las referencias.
    La tabla de Proyectos muestra, calculadas desde la hoja `Tiempos`, las horas
    dedicadas en el mes, en el mes anterior y en el año en curso.
+5. Probar el **drill down**: en *Proyectos*, la flecha **▾** junto al número abre
+   el detalle del proyecto con esas tres cifras, los registros agrupados por mes
+   (del actual hacia el pasado) y la paginación de 100 en 100. Si la flecha no
+   aparece, el `Index.html`/`ClientTables.html` del despliegue está desactualizado.
 
 ## Publicar cambios en la URL `/exec`
 
@@ -134,5 +138,5 @@ y reemplazar el `href` del `<link type="image/svg+xml">` en `Index.html`.
 ## Pruebas locales antes de cada push
 
 ```powershell
-node tests/client.smoke.js   # 96 comprobaciones del cliente (debe salir EXIT=0)
+node tests/client.smoke.js   # 107 comprobaciones del cliente (debe salir EXIT=0)
 ```

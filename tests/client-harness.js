@@ -209,6 +209,71 @@ const backend = {
     calls.push(['apiSaveTableRow', [table, payload]]);
     return { ok: true, data: { table: table, row: Object.assign({ _row: 7 }, payload), created: !payload._row } };
   },
+  /**
+   * Detalle de un proyecto (drill down). El proyecto 9 no tiene registros.
+   * El mock no reproduce el orden ni la paginacion del servidor: entrega dos
+   * paginas ya armadas para comprobar que el cliente las pide y las pinta.
+   */
+  apiProjectDetail(numero, page) {
+    calls.push(['apiProjectDetail', [numero, page]]);
+    const p = Math.max(1, Number(page) || 1);
+    const vacio = String(numero) === '9';
+
+    const octubre = {
+      monthKey: '2026-10',
+      label: 'Octubre 2026',
+      count: 1,
+      totalMinutos: 60,
+      monthCount: 1,
+      monthMinutos: 60,
+      entries: [
+        entry({
+          _row: 13, fecha: '2026-10-05', horaInicio: '09:00', horaFin: '10:00', minutos: 60,
+          tipoActividad: 'Analisis', actividad: 'De octubre', observaciones: 'Cierre del mes'
+        })
+      ]
+    };
+
+    const noviembre = {
+      monthKey: '2026-11',
+      label: 'Noviembre 2026',
+      count: 2,
+      totalMinutos: 90,
+      monthCount: 2,
+      monthMinutos: 90,
+      entries: [
+        entry({
+          _row: 10, fecha: '2026-11-01', horaInicio: '08:00', horaFin: '09:00', minutos: 60,
+          actividad: 'Primera del mes'
+        }),
+        entry({
+          _row: 11, fecha: '2026-11-02', horaInicio: '08:00', horaFin: '08:30', minutos: 30,
+          actividad: 'Segunda del mes'
+        })
+      ]
+    };
+
+    return {
+      ok: true,
+      data: {
+        proyecto: {
+          numero: String(numero), nombre: 'Sitio web', cliente: 'Acme',
+          activo: true, fechaCreacion: '2026-01-05'
+        },
+        periods: {
+          monthLabel: 'noviembre 2026', previousMonthLabel: 'octubre 2026', yearLabel: 'año 2026'
+        },
+        totals: vacio
+          ? { minutosMes: 0, minutosMesAnterior: 0, minutosAnio: 0, totalMinutos: 0, count: 0 }
+          : { minutosMes: 90, minutosMesAnterior: 60, minutosAnio: 300, totalMinutos: 150, count: 150 },
+        rango: vacio ? { desde: '', hasta: '' } : { desde: '2026-10-05', hasta: '2026-11-02' },
+        page: vacio ? 1 : p,
+        pageSize: 100,
+        pageCount: vacio ? 1 : 2,
+        months: vacio ? [] : (p === 1 ? [noviembre] : [octubre])
+      }
+    };
+  },
   apiIdentifyUser(codigo) {
     calls.push(['apiIdentifyUser', [codigo]]);
     return { ok: true, data: bootstrapData() };
