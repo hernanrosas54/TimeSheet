@@ -1,0 +1,35 @@
+# Reglas del proyecto TimeSheet (GAS)
+
+## Regla principal: no tocar clasp ni Git sin pedido explícito
+
+- **Nunca** ejecutes `clasp` (`push`, `pull`, `deploy`, `version`,
+  `update-deployment`, `run`, `clone`, `logs`, …) salvo que el usuario lo pida
+  explícitamente en el mensaje actual.
+- **Nunca** ejecutes `git commit`, `git push`, `git tag`, `git rebase`,
+  `git reset --hard`, `git stash` salvo que el usuario lo pida explícitamente.
+- "Arregla esto", "verifica", "revisa" **no** son autorización. En su lugar:
+  editar archivos locales, correr las pruebas y decir qué comandos debe ejecutar
+  el usuario.
+- Permitido sin pedirlo: leer/buscar en el código, `node tests/client.smoke.js`,
+  `git status`, `git diff`, `git log` (usar `git --no-pager` o
+  `$env:GIT_PAGER='cat'`).
+
+## Al terminar cualquier cambio
+
+1. `node tests/client.smoke.js` debe terminar con `Todas las comprobaciones
+   pasaron.` y código 0 (si cambias el número de comprobaciones, actualiza
+   `README.md`, `tests/README.md` y `DEPLOY.md`).
+2. Resumir archivos modificados; recordar que quedan **sin commit**.
+3. Enumerar (sin ejecutar) los pasos de despliegue: `clasp -u hrosas push -f` →
+   verificar con el bloque "Verificar que el push subió TODO" de `DEPLOY.md` →
+   `create-version` + `update-deployment` solo si el usuario lo autoriza.
+
+## Contexto técnico útil
+
+- El proyecto tiene 14 archivos que se suben con clasp (ver `.claspignore`);
+  un `clasp push` sube **todos**, no solo los modificados.
+- Un push parcial (o pegar archivos a mano en el editor de Apps Script) deja el
+  remoto mezclado y provoca errores como `Cannot read properties of null` o
+  registros duplicados al editar (cliente nuevo + `Api.gs` viejo).
+- `/exec` solo cambia al crear una versión nueva y actualizar el deployment;
+  `/dev` refleja el último push.
