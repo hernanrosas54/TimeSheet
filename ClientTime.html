@@ -10,6 +10,7 @@ window.TimePage = (function () {
     tipo: '',
     bound: false,
     saving: false,
+    editing: null,
     day: { entries: [], totalMinutos: 0, fecha: '' }
   };
 
@@ -138,14 +139,27 @@ window.TimePage = (function () {
 
     // Delegación: el botón «Copiar» de cada registro del día rellena el formulario.
     el('dayList').addEventListener('click', function (event) {
-      const button = event.target && typeof event.target.closest === 'function'
-        ? event.target.closest('[data-copy-entry]')
-        : null;
-      if (!button) return;
+      const target = event.target && typeof event.target.closest === 'function' ? event.target : null;
+      if (!target) return;
 
       const entries = (state.day && state.day.entries) || [];
-      const entry = entries[Number(button.dataset.copyEntry)];
-      if (entry) copyEntryToForm(entry);
+
+      const copyButton = target.closest('[data-copy-entry]');
+      if (copyButton) {
+        const entry = entries[Number(copyButton.dataset.copyEntry)];
+        if (entry) copyEntryToForm(entry);
+        return;
+      }
+
+      const editButton = target.closest('[data-edit-entry]');
+      if (editButton) {
+        const entry = entries[Number(editButton.dataset.editEntry)];
+        if (entry) editEntryToForm(entry);
+      }
+    });
+
+    el('btnCancelEdit').addEventListener('click', function () {
+      cancelEdit();
     });
   }
 
@@ -238,6 +252,9 @@ window.TimePage = (function () {
   function copyEntryToForm(entry) {
     if (!entry) return;
 
+    // Copiar siempre prepara un registro nuevo: se abandona cualquier edición.
+    clearEditing();
+
     const project = state.projectCombo.setSelectedByValue(entry.proyecto);
     if (!project) {
       // El proyecto ya no está en la lista: se deja el número visible y marcado
@@ -270,6 +287,92 @@ window.TimePage = (function () {
       ' ya no está en la lista. Elige uno válido antes de guardar.', 'error', 6000);
   }
 
+  /* ------------------------------------------------------------ Edición */
+  /**
+   * Carga en el formulario un registro del día para corregirlo: proyecto, tipo
+   * de actividad, actividad, observaciones, fecha y horas. El botón de guardado
+   * pasa a «Guardar cambios» y el envío incluye "_row" para actualizar la fila.
+   */
+  function editEntryToForm(entry) {
+    if (!entry) return;
+
+    const project = state.projectCombo.setSelectedByValue(entry.proyecto);
+    if (!project) {
+      // El proyecto ya no está en la lista: se deja el número visible y marcado
+      // como inválido para que no se guarde por error con otro proyecto.
+      el('projectInput').value = entry.proyecto || '';
+      el('projectInput').classList.add('is-invalid');
+      state.project = null;
+    }
+    renderProjectHint();
+
+    const tipo = state.typeCombo.setSelectedByValue(entry.tipoActividad);
+    if (!tipo) {
+      el('typeInput').value = entry.tipoActividad || '';
+      el('typeInput').classList.add('is-invalid');
+      state.tipo = '';
+    }
+
+    el('activity').value = entry.actividad || '';
+    el('activity').classList.remove('is-invalid');
+    el('notes').value = entry.observaciones || '';
+    el('entryDate').value = entry.fecha || el('entryDate').value;
+    el('startTime').value = entry.horaInicio || '';
+    el('endTime').value = entry.horaFin || '';
+
+    state.editing = {
+      row: Number(entry._row) || 0,
+      proyecto: entry.proyecto || '',
+      fecha: entry.fecha || el('entryDate').value
+    };
+
+    showEditBanner(entry);
+    showError('');
+    updatePreview();
+    renderDay(state.day);
+    el('activity').focus();
+
+    // Si el registro es de otra fecha, se recarga el panel de ese día.
+    if (state.day && state.day.fecha && state.day.fecha !== state.editing.fecha) loadDay();
+
+    if (project && tipo) {
+      Core.toast('Editando el registro ' + entry.horaInicio + ' – ' + entry.horaFin + '.', 'info');
+      return;
+    }
+
+    Core.toast('Registro cargado, pero ' + (!project ? 'el proyecto' : 'el tipo de actividad') +
+      ' ya no está en la lista. Elige uno válido antes de guardar.', 'error', 6000);
+  }
+
+  /** Muestra el aviso de edición y cambia el texto del botón de guardado. */
+  function showEditBanner(entry) {
+    const banner = el('editBanner');
+    const text = el('editBannerText');
+
+    if (text) {
+      text.textContent = 'Editando ' + entry.horaInicio + ' – ' + entry.horaFin + ' · ' +
+        entry.proyecto + ' · ' + entry.tipoActividad;
+    }
+
+    banner.classList.remove('hidden');
+    el('btnSave').textContent = 'Guardar cambios';
+  }
+
+  /** Sale del modo edición sin tocar lo que haya en el formulario. */
+  function clearEditing() {
+    state.editing = null;
+    el('editBanner').classList.add('hidden');
+    el('btnSave').textContent = 'Guardar registro';
+  }
+
+  /** Descarta la edición en curso y deja el formulario listo para un alta. */
+  function cancelEdit() {
+    if (!state.editing) return;
+    clearEditing();
+    Core.toast('Edición cancelada; no se guardó ningún cambio.', 'info');
+    resetForm(true);
+  }
+
   function renderDay(day) {
     const list = el('dayList');
     const total = el('dayTotal');
@@ -299,7 +402,9 @@ window.TimePage = (function () {
     list.innerHTML = entries.map(function (entry, index) {
       const titulo = entry.proyecto + ' · ' + (entry.proyectoNombre || 'Proyecto');
       const resumen = entry.tipoActividad + ' · ' + entry.actividad;
-      return '<li class="rounded-lg border border-slate-200 px-3 py-2">' +
+      const enEdicion = !!state.editing && Number(state.editing.row) === Number(entry._row);
+      return '<li class="rounded-lg border px-3 py-2 ' +
+          (enEdicion ? 'border-amber-300 bg-amber-50' : 'border-slate-200') + '">' +
         '<div class="flex items-start justify-between gap-2">' +
           '<div class="min-w-0 flex-1">' +
             '<div class="flex flex-wrap items-center gap-2">' +
@@ -312,11 +417,18 @@ window.TimePage = (function () {
             '<p class="truncate text-xs text-slate-500" title="' + Core.escapeHtml(resumen) + '">' +
               Core.escapeHtml(resumen) + '</p>' +
           '</div>' +
-          '<button type="button" class="btn btn-ghost btn-sm shrink-0" data-copy-entry="' + index + '"' +
+          '<div class="flex shrink-0 items-center gap-1">' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-copy-entry="' + index + '"' +
             ' title="Copiar al formulario: ' + Core.escapeHtml(resumen) + '"' +
             ' aria-label="Copiar ' + Core.escapeHtml(titulo) + ' al formulario">' +
             '<span aria-hidden="true">⧉</span><span class="hidden sm:inline">Copiar</span>' +
           '</button>' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-edit-entry="' + index + '"' +
+            ' title="Editar este registro: ' + Core.escapeHtml(resumen) + '"' +
+            ' aria-label="Editar ' + Core.escapeHtml(titulo) + '">' +
+            '<span aria-hidden="true">✎</span><span class="hidden sm:inline">Editar</span>' +
+          '</button>' +
+          '</div>' +
         '</div>' +
         '</li>';
     }).join('');
@@ -372,7 +484,9 @@ window.TimePage = (function () {
     el('typeInput').classList.toggle('is-invalid', !type);
 
     if (!project) throw new Error('Selecciona un proyecto de la lista.');
-    if (project.activo === false) {
+    const mantieneProyectoEditado = !!state.editing &&
+      Core.normalize(project.value) === Core.normalize(state.editing.proyecto);
+    if (project.activo === false && !mantieneProyectoEditado) {
       throw new Error('El proyecto ' + project.value + ' está inactivo. Elige un proyecto activo.');
     }
     if (!type) throw new Error('Selecciona un tipo de actividad de la lista.');
@@ -383,7 +497,7 @@ window.TimePage = (function () {
     }
     if (!actividad) throw new Error('Escribe la actividad realizada.');
 
-    return {
+    const data = {
       proyecto: project.value,
       tipoActividad: type.value,
       actividad: actividad,
@@ -392,6 +506,11 @@ window.TimePage = (function () {
       horaInicio: inicio,
       horaFin: finRaw ? Core.roundToStep(finRaw, roundStep()) : ''
     };
+
+    // Al corregir un registro se envía la fila para que el servidor la actualice.
+    if (state.editing && Number(state.editing.row) > 0) data._row = Number(state.editing.row);
+
+    return data;
   }
 
   async function save() {
@@ -408,14 +527,17 @@ window.TimePage = (function () {
     }
 
     const button = el('btnSave');
+    const editando = !!state.editing;
+    let edicionGuardada = false;
     state.saving = true;
     Core.setBusy(button, true, 'Guardando…');
 
     try {
       const result = await Core.call('apiSaveTimeEntry', payload);
+      edicionGuardada = true;
       const saved = result.entry;
 
-      Core.toast('Guardado: ' + saved.proyecto + ' · ' + Core.formatMinutes(saved.minutos), 'success');
+      Core.toast((editando ? 'Actualizado: ' : 'Guardado: ') + saved.proyecto + ' · ' + Core.formatMinutes(saved.minutos), 'success');
 
       // Preparar el siguiente registro: la hora fin pasa a ser la hora inicio.
       el('startTime').value = saved.horaFin;
@@ -439,10 +561,14 @@ window.TimePage = (function () {
     } finally {
       state.saving = false;
       Core.setBusy(button, false);
+      // setBusy restaura la etiqueta que tenía el botón; si la edición se
+      // guardó, después se vuelve a «Guardar registro».
+      if (edicionGuardada) clearEditing();
     }
   }
 
   function resetForm(clearTimes) {
+    clearEditing();
     state.projectCombo.clear();
     state.project = null;
     state.typeCombo.clear();
@@ -470,6 +596,8 @@ window.TimePage = (function () {
     updatePreview: updatePreview,
     loadDay: loadDay,
     save: save,
+    editEntryToForm: editEntryToForm,
+    cancelEdit: cancelEdit,
     resetForm: resetForm,
     state: state
   };

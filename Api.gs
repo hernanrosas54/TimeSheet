@@ -410,15 +410,31 @@ function apiDayEntries(fecha) {
 }
 
 
-/** Guarda un registro de tiempo del usuario identificado. */
+/**
+ * Guarda un registro de tiempo del usuario identificado.
+ * Si el payload trae "_row" se corrige esa fila; si no, se agrega una nueva.
+ */
 function apiSaveTimeEntry(payload) {
   return api_(function () {
     var user = requireUser_();
     var data = payload || {};
 
+    var rowNumber = Number(data._row) || 0;
+    var current = null;
+
+    if (rowNumber) {
+      current = readTable_(CONFIG.SHEETS.TIEMPOS).filter(function (item) {
+        return item._row === rowNumber;
+      })[0];
+      assert_(current, 'El registro ' + rowNumber + ' ya no existe. Recarga los registros del día.');
+      assert_(String(current.codigoUsuario || '').toUpperCase() === String(user.codigo || '').toUpperCase(),
+        'El registro ' + rowNumber + ' no pertenece a tu usuario: no puedes corregirlo.');
+    }
+
     var project = findProject_(data.proyecto);
     assert_(project, 'Selecciona un proyecto válido de la lista.');
-    assert_(project.activo !== false, 'El proyecto ' + project.numero + ' está inactivo. Selecciona un proyecto activo.');
+    var mismoProyecto = !!current && String(current.proyecto || '') === String(project.numero);
+    assert_(project.activo !== false || mismoProyecto, 'El proyecto ' + project.numero + ' está inactivo. Selecciona un proyecto activo.');
 
     var tipo = String(data.tipoActividad == null ? '' : data.tipoActividad).trim();
     assert_(tipo, 'Selecciona el tipo de actividad.');
@@ -454,19 +470,26 @@ function apiSaveTimeEntry(payload) {
       minutos: minutos
     };
 
-    var rowNumber = 0;
-    withLock_(function () {
-      rowNumber = appendRow_(CONFIG.SHEETS.TIEMPOS, entry);
-    });
-
-    entry._row = rowNumber;
+    if (current) {
+      withLock_(function () {
+        updateRow_(CONFIG.SHEETS.TIEMPOS, rowNumber, entry);
+      });
+      entry._row = rowNumber;
+    } else {
+      var newRow = 0;
+      withLock_(function () {
+        newRow = appendRow_(CONFIG.SHEETS.TIEMPOS, entry);
+      });
+      entry._row = newRow;
+    }
 
     var projectMap = {};
     projectMap[project.numero] = project;
 
     return {
       entry: decorateEntry_(entry, projectMap),
-      dayEntries: getDayEntries_(user.codigo, fecha)
+      dayEntries: getDayEntries_(user.codigo, fecha),
+      updated: !!current
     };
   });
 }

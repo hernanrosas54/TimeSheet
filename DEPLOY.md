@@ -54,6 +54,23 @@ Quedan fuera: `tests/**`, `*.md`, `.clasp.json`, `.claspignore`.
    La tabla de Proyectos muestra, calculadas desde la hoja `Tiempos`, las horas
    dedicadas en el mes, en el mes anterior y en el año en curso.
 
+## Publicar cambios en la URL `/exec`
+
+`clasp push` solo actualiza el proyecto y la implementación de prueba (`/dev`).
+La URL operativa `/exec` sigue apuntando a la **versión** que se le asignó a esa
+implementación, así que después de cada push hay que crear una versión nueva y
+reasignarla:
+
+```powershell
+clasp -u hrosas create-version "Descripcion del cambio"   # devuelve el numero de version
+clasp -u hrosas list-deployments                          # ubicar el ID de la implementacion operativa
+clasp -u hrosas update-deployment <ID> --versionNumber <N> -d "Operacional"
+```
+
+También se puede hacer desde el editor: *Implementar → Gestionar
+implementaciones →* editar la implementación operativa *→ Versión: Nueva
+versión → Implementar*.
+
 ## Favicon (icono de la pestaña)
 
 El icono se define en `Index.html` con dos `<link rel="icon">` en **data URI**
@@ -85,5 +102,5 @@ y reemplazar el `href` del `<link type="image/svg+xml">` en `Index.html`.
 ## Pruebas locales antes de cada push
 
 ```powershell
-node tests/client.smoke.js   # 68 comprobaciones del cliente (debe salir EXIT=0)
+node tests/client.smoke.js   # 91 comprobaciones del cliente (debe salir EXIT=0)
 ```

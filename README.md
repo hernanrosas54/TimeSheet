@@ -14,6 +14,10 @@ Usuarios y Tipos de Actividad).
   Cada registro tiene un botón **⧉ Copiar** que lleva al formulario su proyecto,
   tipo de actividad y actividad, para retomar un trabajo ya iniciado sin volver a
   escribirlo.
+- **Corrección de registros**: el botón **✎ Editar** de cada registro del día
+  carga el formulario completo (proyecto, tipo, actividad, observaciones, fecha y
+  horas); al guardar se actualiza esa fila de `Tiempos` en lugar de crear otra.
+  Una banda ámbar avisa de que se está editando y permite cancelar.
 - **Proyectos** con las horas dedicadas en el mes, en el mes anterior y en el año,
   calculadas desde la hoja `Tiempos` (no se almacenan). Los encabezados
   **Horas Mes**, **Horas Mes Anterior** y **Horas Año** se ordenan al hacer clic:
@@ -49,7 +53,7 @@ Usuarios y Tipos de Actividad).
 
 ```powershell
 clasp -u hrosas push -f                         # sube los 14 archivos del proyecto
-node tests/client.smoke.js                      # 68 comprobaciones del cliente
+node tests/client.smoke.js                      # 91 comprobaciones del cliente
 ```
 
 Tras el push, ejecutar `setupTimeSheet` una vez en el editor de Apps Script y

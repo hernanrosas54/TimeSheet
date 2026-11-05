@@ -153,8 +153,26 @@ const backend = {
   },
   apiSaveTimeEntry(payload) {
     calls.push(['apiSaveTimeEntry', [payload]]);
-    const saved = entry({ horaInicio: payload.horaInicio, horaFin: payload.horaFin || '10:00', minutos: 60, fecha: payload.fecha });
-    return { ok: true, data: { entry: saved, dayEntries: { fecha: payload.fecha, entries: [saved], totalMinutos: 60, count: 1 } } };
+    const saved = entry({
+      _row: Number(payload._row) || 11,
+      proyecto: payload.proyecto,
+      tipoActividad: payload.tipoActividad,
+      actividad: payload.actividad,
+      observaciones: payload.observaciones || '',
+      horaInicio: payload.horaInicio,
+      horaFin: payload.horaFin || '10:00',
+      minutos: 60,
+      fecha: payload.fecha
+    });
+    return {
+      ok: true,
+      data: {
+        entry: saved,
+        dayEntries: { fecha: payload.fecha, entries: [saved], totalMinutos: 60, count: 1 },
+        // El servidor marca "updated" cuando el payload traia "_row".
+        updated: !!payload._row
+      }
+    };
   },
   apiListTable(table) {
     calls.push(['apiListTable', [table]]);

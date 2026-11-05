@@ -162,6 +162,12 @@
 
               <p id="formError" class="mt-4 hidden rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700"></p>
 
+              <!-- Aviso de edición: aparece al pulsar ✎ en un registro del día. -->
+              <div id="editBanner" class="mt-4 hidden flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <span id="editBannerText" class="min-w-0 truncate">Editando registro</span>
+                <button id="btnCancelEdit" type="button" class="btn btn-ghost btn-sm shrink-0">Cancelar</button>
+              </div>
+
               <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
                 <button id="btnReset" type="button" class="btn btn-ghost">Limpiar formulario</button>
                 <button id="btnSave" type="submit" class="btn btn-primary">Guardar registro</button>
@@ -192,6 +198,9 @@
                 <li>Los registros del día se muestran del más reciente al más antiguo.</li>
                 <li>El botón <kbd class="rounded border border-slate-300 px-1">⧉</kbd> copia al formulario el
                   proyecto, el tipo de actividad y la actividad del registro.</li>
+                <li>El botón <kbd class="rounded border border-slate-300 px-1">✎</kbd> carga el registro completo
+                  (también fecha, horas y observaciones) para corregirlo; el botón de guardado cambia a
+                  «Guardar cambios» y el registro se actualiza en vez de duplicarse.</li>
               </ul>
             </div>
           </aside>

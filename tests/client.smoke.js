@@ -62,6 +62,78 @@ const { context, get, calls, check, failures, tick } = env;
   check('copiar el segundo registro', get('typeInput').value === 'Analisis' && get('activity').value === 'Revisión de backlog',
     get('typeInput').value + ' / ' + get('activity').value);
 
+  // 2c) Boton editar: carga el registro completo en el formulario.
+  const clickEdit = (index) => get('dayList').dispatch('click', {
+    target: {
+      closest: (selector) => (selector === '[data-edit-entry]' ? { dataset: { editEntry: String(index) } } : null)
+    }
+  });
+
+  check('boton editar en cada registro', (dayHtml.match(/data-edit-entry=/g) || []).length === 2, dayHtml.slice(0, 320));
+  check('sin modo edicion al inicio',
+    context.TimePage.state.editing === null && !/^Editando/.test(get('editBannerText').textContent),
+    JSON.stringify(context.TimePage.state.editing) + ' / ' + get('editBannerText').textContent);
+
+  get('notes').value = 'algo escrito';
+  clickEdit(0);
+  check('editar rellena el proyecto', get('projectInput').value === '15 · Sitio web', get('projectInput').value);
+  check('editar rellena el tipo de actividad', get('typeInput').value === 'Programacion', get('typeInput').value);
+  check('editar rellena actividad y observaciones',
+    get('activity').value === 'Maquetado' && get('notes').value === '', get('activity').value + ' / ' + get('notes').value);
+  check('editar rellena fecha y horas',
+    get('entryDate').value === '2026-11-04' && get('startTime').value === '08:00' && get('endTime').value === '09:30',
+    get('entryDate').value + ' ' + get('startTime').value + '-' + get('endTime').value);
+  check('banner de edicion visible',
+    !get('editBanner').classList.contains('hidden') && /08:00/.test(get('editBannerText').textContent),
+    get('editBannerText').textContent);
+  check('boton guardar en modo edicion', get('btnSave').textContent === 'Guardar cambios', get('btnSave').textContent);
+  check('registro en edicion resaltado', /border-amber-300/.test(get('dayList').innerHTML), get('dayList').innerHTML.slice(0, 200));
+
+  // 2c-bis) Copiar mientras se edita: se vuelve al modo alta.
+  clickCopy(0);
+  check('copiar cancela el modo edicion',
+    context.TimePage.state.editing === null && get('btnSave').textContent === 'Guardar registro',
+    JSON.stringify(context.TimePage.state.editing) + ' / ' + get('btnSave').textContent);
+  clickEdit(0);
+
+  // 2d) Cancelar la edicion: no se guarda nada y el formulario queda limpio.
+  const beforeCancel = calls.length;
+  get('btnCancelEdit').dispatch('click');
+  await tick(120);
+  check('cancelar oculta el banner', get('editBanner').classList.contains('hidden'), get('editBanner').classList.value);
+  check('cancelar restaura el boton', get('btnSave').textContent === 'Guardar registro', get('btnSave').textContent);
+  check('cancelar limpia el formulario',
+    get('activity').value === '' && get('projectInput').value === '' && get('endTime').value === '',
+    get('activity').value + ' / ' + get('projectInput').value + ' / ' + get('endTime').value);
+  check('cancelar no guarda', !calls.slice(beforeCancel).some((c) => c[0] === 'apiSaveTimeEntry'),
+    JSON.stringify(calls.slice(beforeCancel).map((c) => c[0])));
+
+  // 2e) Guardar en modo edicion: actualiza esa fila, no crea otra.
+  clickEdit(1);
+  check('editar el segundo registro',
+    get('startTime').value === '07:00' && get('endTime').value === '07:30' && get('typeInput').value === 'Analisis',
+    get('startTime').value + '-' + get('endTime').value + ' ' + get('typeInput').value);
+  get('activity').value = 'Revisión de backlog corregida';
+  get('endTime').value = '07:40';
+  const beforeUpdate = calls.length;
+  context.TimePage.save();
+  await tick(140);
+  const updateCall = calls.slice(beforeUpdate).find((c) => c[0] === 'apiSaveTimeEntry');
+  check('modo edicion llama apiSaveTimeEntry', !!updateCall);
+  if (updateCall) {
+    const updatePayload = updateCall[1][0];
+    check('payload._row de la fila editada', updatePayload._row === 9, JSON.stringify(updatePayload));
+    check('payload.actividad corregida', updatePayload.actividad === 'Revisión de backlog corregida', updatePayload.actividad);
+    check('payload conserva fecha y proyecto', updatePayload.fecha === '2026-11-04' && updatePayload.proyecto === '15',
+      updatePayload.fecha + ' / ' + updatePayload.proyecto);
+    check('payload.horas corregidas', updatePayload.horaInicio === '07:00' && updatePayload.horaFin === '07:40',
+      updatePayload.horaInicio + '-' + updatePayload.horaFin);
+  }
+  check('termina el modo edicion',
+    get('editBanner').classList.contains('hidden') && get('btnSave').textContent === 'Guardar registro',
+    get('editBanner').classList.value + ' / ' + get('btnSave').textContent);
+  check('hora inicio avanza al fin editado', get('startTime').value === '07:40', get('startTime').value);
+
   // 3) Vista previa de duracion.
   get('startTime').value = '08:00';
   get('endTime').value = '09:35';
@@ -94,6 +166,7 @@ const { context, get, calls, check, failures, tick } = env;
     check('payload.fecha', payload.fecha === '2026-11-04', payload.fecha);
     check('payload.horas', payload.horaInicio === '08:00' && payload.horaFin === '09:00', payload.horaInicio + '-' + payload.horaFin);
     check('payload.actividad', payload.actividad === 'Maquetado home', payload.actividad);
+    check('payload sin _row al crear', payload._row === undefined, String(payload._row));
   }
   check('hora inicio avanza al fin', get('startTime').value === '09:00', get('startTime').value);
   check('actividad limpiada', get('activity').value === '', get('activity').value);

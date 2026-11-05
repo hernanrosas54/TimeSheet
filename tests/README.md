@@ -17,6 +17,9 @@ Comprueba, entre otras cosas:
 - Panel de registros del día ordenado por hora de inicio descendente y botón
   **Copiar** que rellena proyecto, tipo de actividad y actividad en el formulario
   sin modificar la fecha ni las horas.
+- Botón **Editar** de cada registro: carga el registro completo en el formulario
+  (fecha, horas y observaciones incluidas), envía `_row` al guardar para
+  actualizar esa fila y permite cancelar la edición sin guardar nada.
 - Botón **Ahora** junto a la hora de inicio: rellena la hora actual redondeada al
   paso configurado.
 - Listado de tablas con el nombre como enlace de edición (sin botones de alta
@@ -26,5 +29,5 @@ Comprueba, entre otras cosas:
   ascendente y tercero quita el orden.
 - Listado de registros de tiempo con filtros y cambio de usuario.
 
-Salida esperada: `Todas las comprobaciones pasaron.` (68 comprobaciones) y código
+Salida esperada: `Todas las comprobaciones pasaron.` (91 comprobaciones) y código
 de salida 0.
