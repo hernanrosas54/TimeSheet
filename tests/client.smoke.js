@@ -38,6 +38,12 @@ const { context, get, calls, check, failures, tick } = env;
     dayHtml.indexOf('08:00') !== -1 && dayHtml.indexOf('07:00') !== -1 && dayHtml.indexOf('08:00') < dayHtml.indexOf('07:00'),
     dayHtml.slice(0, 320));
   check('boton copiar en cada registro', (dayHtml.match(/data-copy-entry=/g) || []).length === 2, dayHtml.slice(0, 320));
+  check('acciones del dia solo con icono',
+    /btn-icon/.test(dayHtml) && /⧉/.test(dayHtml) && /✎/.test(dayHtml) && !/Copiar</.test(dayHtml) && !/Editar</.test(dayHtml),
+    dayHtml.slice(0, 260));
+  check('registro del dia a todo el ancho',
+    /whitespace-nowrap/.test(dayHtml) && !/truncate/.test(dayHtml),
+    dayHtml.slice(0, 260));
   check('fecha por defecto', get('entryDate').value === '2026-11-04', get('entryDate').value);
   check('hora inicio por defecto', get('startTime').value === '09:30', get('startTime').value);
   check('hint de tipos', /2 tipos disponibles/.test(get('typeHint').textContent), get('typeHint').textContent);
@@ -288,6 +294,45 @@ const { context, get, calls, check, failures, tick } = env;
   await tick(120);
   check('apiForgetIdentity llamado', calls.slice(beforeSwitch).some((c) => c[0] === 'apiForgetIdentity'));
   check('vuelve a pantalla de identificacion', !get('page-identity').classList.contains('hidden'), get('page-identity').classList.value);
+
+  // 10b) Api.gs desactualizado: el cliente envia "_row" pero el servidor responde
+  //      como un alta (sin "updated"). Debe avisarse en vez de dar por corregido.
+  const fakeEntry = {
+    _row: 9, proyecto: '15', tipoActividad: 'Programacion', actividad: 'Maquetado',
+    observaciones: '', fecha: '2026-11-04', horaInicio: '07:00', horaFin: '07:40', minutos: 40
+  };
+  const originalSave = env.backend.apiSaveTimeEntry;
+  env.backend.apiSaveTimeEntry = function (payload) {
+    calls.push(['apiSaveTimeEntry', [payload]]);
+    const saved = Object.assign({ proyectoNombre: 'Sitio web', cliente: 'Acme', minutos: 60 }, payload, { _row: 45 });
+    return { ok: true, data: { entry: saved, dayEntries: { fecha: payload.fecha, entries: [saved], totalMinutos: 60, count: 1 } } };
+  };
+  const toastsBefore = get('toasts').children.length;
+  context.TimePage.editEntryToForm(fakeEntry);
+  await tick(20);
+  context.TimePage.save();
+  await tick(160);
+  env.backend.apiSaveTimeEntry = originalSave;
+  const avisos = get('toasts').children.slice(toastsBefore)
+    .map((item) => item.innerHTML).join(' | ');
+  check('detecta servidor sin soporte de _row', /Api\.gs/.test(avisos), avisos.slice(0, 120));
+  check('payload de la edicion llevaba _row', calls.slice(-1)[0][1][0]._row === 9, JSON.stringify(calls.slice(-1)[0][1][0]));
+
+  // 11) HTML de otra version: si el aviso de edicion no existe, nada debe fallar.
+  //     (Ese fue el error real: ClientTime nuevo + Index.html viejo => al arrancar
+  //     se hacia addEventListener sobre un elemento nulo.)
+  env.setMissing(['editBanner', 'editBannerText', 'btnCancelEdit']);
+  let errorSinAviso = '';
+  try {
+    context.TimePage.state.bound = false;
+    context.TimePage.init();
+    context.TimePage.editEntryToForm(fakeEntry);
+    context.TimePage.cancelEdit();
+  } catch (error) {
+    errorSinAviso = error.message;
+  }
+  env.setMissing([]);
+  check('HTML sin aviso de edicion no rompe el arranque', errorSinAviso === '', errorSinAviso);
 
   console.log('');
   if (failures.length) {

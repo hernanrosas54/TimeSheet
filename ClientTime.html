@@ -158,9 +158,10 @@ window.TimePage = (function () {
       }
     });
 
-    el('btnCancelEdit').addEventListener('click', function () {
-      cancelEdit();
-    });
+    // El aviso de edición es opcional: si el HTML servido viene de otra versión
+    // (sin #btnCancelEdit), la aplicación debe arrancar igual en vez de fallar.
+    const cancelButton = el('btnCancelEdit');
+    if (cancelButton) cancelButton.addEventListener('click', cancelEdit);
   }
 
   /* ------------------------------------------------------------ Carga de datos */
@@ -354,15 +355,21 @@ window.TimePage = (function () {
         entry.proyecto + ' · ' + entry.tipoActividad;
     }
 
-    banner.classList.remove('hidden');
-    el('btnSave').textContent = 'Guardar cambios';
+    if (banner) banner.classList.remove('hidden');
+
+    const saveButton = el('btnSave');
+    if (saveButton) saveButton.textContent = 'Guardar cambios';
   }
 
   /** Sale del modo edición sin tocar lo que haya en el formulario. */
   function clearEditing() {
     state.editing = null;
-    el('editBanner').classList.add('hidden');
-    el('btnSave').textContent = 'Guardar registro';
+
+    const banner = el('editBanner');
+    if (banner) banner.classList.add('hidden');
+
+    const saveButton = el('btnSave');
+    if (saveButton) saveButton.textContent = 'Guardar registro';
   }
 
   /** Descarta la edición en curso y deja el formulario listo para un alta. */
@@ -405,31 +412,30 @@ window.TimePage = (function () {
       const enEdicion = !!state.editing && Number(state.editing.row) === Number(entry._row);
       return '<li class="rounded-lg border px-3 py-2 ' +
           (enEdicion ? 'border-amber-300 bg-amber-50' : 'border-slate-200') + '">' +
-        '<div class="flex items-start justify-between gap-2">' +
-          '<div class="min-w-0 flex-1">' +
-            '<div class="flex flex-wrap items-center gap-2">' +
-              '<span class="text-xs font-semibold text-slate-700">' + Core.escapeHtml(entry.horaInicio) +
-                ' – ' + Core.escapeHtml(entry.horaFin) + '</span>' +
-              '<span class="badge">' + Core.formatMinutes(entry.minutos) + '</span>' +
-            '</div>' +
-            '<p class="mt-1 truncate text-xs font-medium text-slate-700" title="' + Core.escapeHtml(titulo) + '">' +
-              Core.escapeHtml(titulo) + '</p>' +
-            '<p class="truncate text-xs text-slate-500" title="' + Core.escapeHtml(resumen) + '">' +
-              Core.escapeHtml(resumen) + '</p>' +
+        // Cabecera: horas y duración a la izquierda, acciones compactas a la derecha.
+        '<div class="flex items-center justify-between gap-2">' +
+          '<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">' +
+            '<span class="whitespace-nowrap text-xs font-semibold text-slate-700">' +
+              Core.escapeHtml(entry.horaInicio) + ' – ' + Core.escapeHtml(entry.horaFin) + '</span>' +
+            '<span class="badge whitespace-nowrap">' + Core.formatMinutes(entry.minutos) + '</span>' +
           '</div>' +
           '<div class="flex shrink-0 items-center gap-1">' +
-          '<button type="button" class="btn btn-ghost btn-sm" data-copy-entry="' + index + '"' +
+          '<button type="button" class="btn btn-ghost btn-icon" data-copy-entry="' + index + '"' +
             ' title="Copiar al formulario: ' + Core.escapeHtml(resumen) + '"' +
             ' aria-label="Copiar ' + Core.escapeHtml(titulo) + ' al formulario">' +
-            '<span aria-hidden="true">⧉</span><span class="hidden sm:inline">Copiar</span>' +
+            '<span aria-hidden="true">⧉</span>' +
           '</button>' +
-          '<button type="button" class="btn btn-ghost btn-sm" data-edit-entry="' + index + '"' +
+          '<button type="button" class="btn btn-ghost btn-icon" data-edit-entry="' + index + '"' +
             ' title="Editar este registro: ' + Core.escapeHtml(resumen) + '"' +
             ' aria-label="Editar ' + Core.escapeHtml(titulo) + '">' +
-            '<span aria-hidden="true">✎</span><span class="hidden sm:inline">Editar</span>' +
+            '<span aria-hidden="true">✎</span>' +
           '</button>' +
           '</div>' +
         '</div>' +
+        // Proyecto y actividad usan todo el ancho de la tarjeta y hacen salto de línea.
+        '<p class="mt-1.5 break-words text-xs font-medium leading-snug text-slate-700">' +
+          Core.escapeHtml(titulo) + '</p>' +
+        '<p class="break-words text-xs leading-snug text-slate-500">' + Core.escapeHtml(resumen) + '</p>' +
         '</li>';
     }).join('');
   }
@@ -528,6 +534,7 @@ window.TimePage = (function () {
 
     const button = el('btnSave');
     const editando = !!state.editing;
+    const filaEditada = Number(payload._row) || 0;
     let edicionGuardada = false;
     state.saving = true;
     Core.setBusy(button, true, 'Guardando…');
@@ -538,6 +545,15 @@ window.TimePage = (function () {
       const saved = result.entry;
 
       Core.toast((editando ? 'Actualizado: ' : 'Guardado: ') + saved.proyecto + ' · ' + Core.formatMinutes(saved.minutos), 'success');
+
+      // El servidor confirma con "updated" cuando corrigió la fila enviada. Si se
+      // envió "_row" y la respuesta no lo confirma, la copia desplegada de Api.gs
+      // es anterior al modo edición: agregó una fila nueva en lugar de corregirla.
+      if (filaEditada && result.updated !== true) {
+        Core.toast('Se agregó un registro nuevo en lugar de corregir el de las ' +
+          payload.horaInicio + '.\nLa copia desplegada de Api.gs no aplica la corrección por "_row": ' +
+          'sube el proyecto completo al editor de Apps Script y vuelve a intentarlo.', 'error', 15000);
+      }
 
       // Preparar el siguiente registro: la hora fin pasa a ser la hora inicio.
       el('startTime').value = saved.horaFin;

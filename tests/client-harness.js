@@ -65,11 +65,14 @@ class FakeElement {
 }
 
 const elements = new Map();
+// Ids que se simulan ausentes (HTML servido de otra versión).
+const missing = new Set();
 
 function makeDocument() {
   return {
     title: '',
     getElementById(id) {
+      if (missing.has(id)) return null;
       if (!elements.has(id)) elements.set(id, new FakeElement(id));
       return elements.get(id);
     },
@@ -269,6 +272,13 @@ function loadPartial(file) {
 const tick = (ms) => new Promise((resolve) => setTimeout(resolve, ms || 60));
 const evalIn = (code) => vm.runInContext(code, context, { filename: 'eval' });
 const get = (id) => document.getElementById(id);
+
+/** Simula que el HTML no trae ciertos ids (por ejemplo, una versión anterior). */
+function setMissing(ids) {
+  missing.clear();
+  (ids || []).forEach((id) => missing.add(id));
+}
+
 const failures = [];
 
 function check(label, condition, detail) {
@@ -280,5 +290,5 @@ function check(label, condition, detail) {
   }
 }
 
-module.exports = { context, get, calls, check, failures, tick, sandbox, elements, backend, evalIn };
+module.exports = { context, get, calls, check, failures, tick, sandbox, elements, backend, evalIn, setMissing };
 

@@ -29,5 +29,5 @@ Comprueba, entre otras cosas:
   ascendente y tercero quita el orden.
 - Listado de registros de tiempo con filtros y cambio de usuario.
 
-Salida esperada: `Todas las comprobaciones pasaron.` (91 comprobaciones) y código
+Salida esperada: `Todas las comprobaciones pasaron.` (96 comprobaciones) y código
 de salida 0.

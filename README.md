@@ -53,7 +53,7 @@ Usuarios y Tipos de Actividad).
 
 ```powershell
 clasp -u hrosas push -f                         # sube los 14 archivos del proyecto
-node tests/client.smoke.js                      # 91 comprobaciones del cliente
+node tests/client.smoke.js                      # 96 comprobaciones del cliente
 ```
 
 Tras el push, ejecutar `setupTimeSheet` una vez en el editor de Apps Script y

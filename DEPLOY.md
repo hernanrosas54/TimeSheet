@@ -31,6 +31,38 @@ Si alguna vez hay que reautenticar: `clasp login --user hrosas`.
 
 Quedan fuera: `tests/**`, `*.md`, `.clasp.json`, `.claspignore`.
 
+## Verificar que el push subió TODO (evita versiones mezcladas)
+
+`clasp push` puede quedar a medias (o alguien puede pegar solo un archivo en el
+editor de Apps Script). Si `ClientTime.html` llega nuevo pero `Index.html` sigue
+viejo, el cliente busca `#btnCancelEdit` y el arranque falla con:
+
+```
+No se pudo iniciar la aplicación
+Cannot read properties of null (reading 'addEventListener')
+```
+
+Antes de avisar que el cambio está listo, comparar el proyecto remoto con el
+local (solo lectura, en una carpeta temporal):
+
+```powershell
+$d = Join-Path $env:TEMP 'remote_src'
+Remove-Item -LiteralPath $d -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Path $d | Out-Null
+Copy-Item .clasp.json, .claspignore $d
+cd $d; clasp -u hrosas pull -f
+cd c:\GAS\TimeSheet
+foreach ($f in 'Index.html','Styles.html','ClientApp.html','ClientCore.html',
+               'ClientTables.html','ClientTime.html','Code.gs','Api.gs') {
+  $a = Join-Path $d $f
+  $norm = { param($p) ([IO.File]::ReadAllText($p)).Replace("`r`n","`n").TrimEnd() }
+  "$f -> $(if ((& $norm $a) -eq (& $norm (Join-Path (Get-Location) $f))) { 'IGUAL' } else { 'DIFERENTE' })"
+}
+```
+
+Todo debe salir `IGUAL`. Si alguno sale `DIFERENTE`, repetir
+`clasp -u hrosas push -f` y volver a comparar antes de publicar la versión.
+
 ## Pasos posteriores al push (una sola vez)
 
 1. **Inicializar la hoja**: en el editor de Apps Script
@@ -102,5 +134,5 @@ y reemplazar el `href` del `<link type="image/svg+xml">` en `Index.html`.
 ## Pruebas locales antes de cada push
 
 ```powershell
-node tests/client.smoke.js   # 91 comprobaciones del cliente (debe salir EXIT=0)
+node tests/client.smoke.js   # 96 comprobaciones del cliente (debe salir EXIT=0)
 ```
