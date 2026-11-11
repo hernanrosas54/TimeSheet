@@ -105,6 +105,7 @@ window.App = (function () {
 
     TimePage.init();
     TablesPage.init();
+    if (window.BulkPage) BulkPage.init();
 
     const page = Core.state.page || 'time';
     Core.navigate(page);
@@ -209,6 +210,7 @@ window.App = (function () {
 
       el('userBadge').textContent = Core.state.user.codigo + ' · ' + Core.state.user.nombre;
       if (window.TimePage) TimePage.refresh();
+      if (window.BulkPage) BulkPage.refresh();
       if (window.TablesPage && Core.state.page === 'entries') TablesPage.loadEntries();
     } catch (error) {
       Core.toast('No se pudieron actualizar los catálogos: ' + error.message, 'error');

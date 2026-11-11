@@ -144,6 +144,7 @@ const Core = (function () {
   /* ------------------------------------------------------------ Pestañas */
   const PAGES = [
     { id: 'time', label: 'Registrar tiempo' },
+    { id: 'batch', label: 'Carga múltiple' },
     { id: 'entries', label: 'Registros' },
     { id: 'table:Proyectos', label: 'Proyectos' },
     { id: 'table:Clientes', label: 'Clientes' },
@@ -168,6 +169,7 @@ const Core = (function () {
   const PAGE_SECTIONS = {
     identity: 'page-identity',
     time: 'page-time',
+    batch: 'page-batch',
     entries: 'page-entries',
     table: 'page-table'
   };
@@ -196,6 +198,12 @@ const Core = (function () {
     if (page === 'time') {
       showSection('time');
       if (window.TimePage) TimePage.refresh();
+      return;
+    }
+
+    if (page === 'batch') {
+      showSection('batch');
+      if (window.BulkPage) BulkPage.refresh();
       return;
     }
 

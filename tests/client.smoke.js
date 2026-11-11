@@ -11,7 +11,7 @@ const { context, get, calls, check, failures, tick } = env;
   const root = path.join(__dirname, '..');
   const dynamic = new Set(['bootRetry', 'rowForm', 'rowError', 'rowSave', 'modalRoot', 'toasts']);
   const used = new Set();
-  ['ClientCore.html', 'ClientTime.html', 'ClientTables.html', 'ClientApp.html'].forEach((file) => {
+  ['ClientCore.html', 'ClientTime.html', 'ClientBulk.html', 'ClientTables.html', 'ClientApp.html'].forEach((file) => {
     const text = fs.readFileSync(path.join(root, file), 'utf8');
     const re = /(?:el|getElementById)\(\s*['"]([A-Za-z0-9_-]+)['"]\s*\)/g;
     let match;
@@ -205,6 +205,111 @@ const { context, get, calls, check, failures, tick } = env;
   await tick(80);
   check('no guarda sin actividad', !calls.slice(beforeNoActivity).some((c) => c[0] === 'apiSaveTimeEntry'));
   check('muestra error de actividad', /actividad/i.test(get('formError').textContent), get('formError').textContent);
+
+  // 5b) Carga múltiple: seis líneas, fecha en el encabezado y encadenado de horas.
+  env.evalIn('Core.navigate("batch")');
+  await tick(60);
+  const batch = context.BulkPage;
+  check('pestaña de carga múltiple', /data-page="batch"/.test(get('tabs').innerHTML), get('tabs').innerHTML.slice(0, 180));
+  check('pantalla de carga múltiple visible', !get('page-batch').classList.contains('hidden'));
+  check('registrar tiempo oculto en carga múltiple', get('page-time').classList.contains('hidden'));
+  check('seis líneas de captura', batch.state.rows.length === 6, String(batch.state.rows.length));
+  check('fecha del encabezado por defecto', get('batchDate').value === '2026-11-04', get('batchDate').value);
+  check('resumen inicial vacío', /^0 líneas completas$/.test(get('batchSummary').textContent), get('batchSummary').textContent);
+
+  const batchRows = batch.state.rows;
+  check('cada línea tiene sus campos',
+    batchRows.every((row) => row.startEl && row.endEl && row.projectEl && row.typeEl && row.activityEl && row.notesEl));
+
+  batchRows[0].startEl.value = '08:00';
+  batchRows[0].endEl.value = '09:35';
+  batchRows[0].endEl.dispatch('change');
+  check('la hora fin se redondea', batchRows[0].endEl.value === '09:40', batchRows[0].endEl.value);
+  check('la hora fin inicializa la línea siguiente', batchRows[1].startEl.value === '09:40', batchRows[1].startEl.value);
+  check('resumen de líneas completas', /1 línea completa · 1 h 40 min/.test(get('batchSummary').textContent), get('batchSummary').textContent);
+
+  batchRows[1].startEl.value = '10:00';
+  batchRows[0].endEl.value = '09:20';
+  batchRows[0].endEl.dispatch('change');
+  check('no pisa la hora inicio ya escrita', batchRows[1].startEl.value === '10:00', batchRows[1].startEl.value);
+
+  batchRows[5].endEl.value = '18:00';
+  batchRows[5].endEl.dispatch('change');
+  batch.addRow();
+  check('agregar línea', batch.state.rows.length === 7, String(batch.state.rows.length));
+  check('la línea nueva arranca en la hora fin anterior',
+    batch.state.rows[6].startEl.value === '18:00', batch.state.rows[6].startEl.value);
+  batch.clearAll();
+  check('vaciar líneas vuelve a seis', batch.state.rows.length === 6, String(batch.state.rows.length));
+
+  const freshRows = batch.state.rows;
+  // El DOM simulado reutiliza los mismos nodos al reconstruir las líneas, así que
+  // se limpian las horas que hubieran quedado de las pruebas anteriores.
+  freshRows.forEach(function (row) {
+    row.startEl.value = '';
+    row.endEl.value = '';
+  });
+  get('batchDate').value = '2026-11-03';
+  freshRows[0].startEl.value = '11:00';
+  freshRows[0].endEl.value = '12:00';
+  freshRows[0].projectEl.value = '16';
+  freshRows[0].typeEl.value = 'Programacion';
+  freshRows[0].activityEl.value = 'Soporte';
+  freshRows[0].notesEl.value = 'Cierre de mes';
+
+  const beforeBatchInvalid = calls.length;
+  batch.save();
+  await tick(100);
+  check('no guarda líneas con proyecto inactivo',
+    !calls.slice(beforeBatchInvalid).some((c) => c[0] === 'apiSaveTimeEntry'));
+  check('marca la línea con error', /inactivo/.test(freshRows[0].errorEl.textContent), freshRows[0].errorEl.textContent);
+
+  freshRows[0].projectEl.value = '15';
+  freshRows[1].startEl.value = '11:30';
+  freshRows[1].endEl.value = '12:30';
+  freshRows[1].projectEl.value = '15';
+  freshRows[1].typeEl.value = 'Analisis';
+  freshRows[1].activityEl.value = 'Solape';
+
+  const beforeOverlap = calls.length;
+  batch.save();
+  await tick(100);
+  check('no guarda líneas solapadas', !calls.slice(beforeOverlap).some((c) => c[0] === 'apiSaveTimeEntry'));
+  check('avisa del solapamiento', /solapa/.test(freshRows[1].errorEl.textContent), freshRows[1].errorEl.textContent);
+
+  freshRows[1].startEl.value = '12:00';
+  freshRows[1].endEl.value = '13:30';
+  const toastsBeforeBatch = get('toasts').children.length;
+  const beforeBatchSave = calls.length;
+  batch.save();
+  await tick(200);
+  const batchCalls = calls.slice(beforeBatchSave).filter((c) => c[0] === 'apiSaveTimeEntry');
+  check('guarda todas las líneas completas', batchCalls.length === 2, String(batchCalls.length));
+
+  const firstBatchPayload = batchCalls[0] && batchCalls[0][1][0];
+  const secondBatchPayload = batchCalls[1] && batchCalls[1][1][0];
+  check('la carga múltiple usa la fecha del encabezado',
+    !!firstBatchPayload && firstBatchPayload.fecha === '2026-11-03' &&
+      firstBatchPayload.horaInicio === '11:00' && firstBatchPayload.horaFin === '12:00',
+    JSON.stringify(firstBatchPayload));
+  check('la línea lleva sus observaciones',
+    !!firstBatchPayload && firstBatchPayload.observaciones === 'Cierre de mes' &&
+      firstBatchPayload.actividad === 'Soporte',
+    JSON.stringify(firstBatchPayload));
+  check('payload de la segunda línea',
+    !!secondBatchPayload && secondBatchPayload.horaInicio === '12:00' &&
+      secondBatchPayload.horaFin === '13:30' && secondBatchPayload.tipoActividad === 'Analisis' &&
+      secondBatchPayload.observaciones === '',
+    JSON.stringify(secondBatchPayload));
+  check('las líneas guardadas se vacían',
+    freshRows[0].projectEl.value === '' && freshRows[1].activityEl.value === '' &&
+      freshRows[0].notesEl.value === '',
+    freshRows[0].projectEl.value + ' / ' + freshRows[1].activityEl.value + ' / ' + freshRows[0].notesEl.value);
+  check('la línea siguiente continúa en la hora fin', freshRows[2].startEl.value === '13:30', freshRows[2].startEl.value);
+  check('sin error en la carga múltiple', get('batchFormError').classList.contains('hidden'), get('batchFormError').textContent);
+
+  const batchToasts = get('toasts').children.slice(toastsBeforeBatch).map((item) => item.innerHTML).join(' | ');
+  check('aviso de líneas guardadas', /Guardados 2 registros del 03\/11\/2026/.test(batchToasts), batchToasts.slice(0, 180));
 
   // 6) Tablas: listado.
   env.evalIn('Core.navigate("table:Proyectos")');

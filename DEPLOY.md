@@ -23,11 +23,11 @@ clasp -u hrosas pull -f                # trae el proyecto remoto (sobrescribe lo
 
 Si alguna vez hay que reautenticar: `clasp login --user hrosas`.
 
-## Archivos que se publican (14)
+## Archivos que se publican (15)
 
 `appsscript.json`, `Code.gs`, `Api.gs`, `Auth.gs`, `Config.gs`, `Data.gs`,
 `Setup.gs`, `Utils.gs`, `Index.html`, `Styles.html`, `ClientApp.html`,
-`ClientCore.html`, `ClientTables.html`, `ClientTime.html`.
+`ClientBulk.html`, `ClientCore.html`, `ClientTables.html`, `ClientTime.html`.
 
 Quedan fuera: `tests/**`, `*.md`, `.clasp.json`, `.claspignore`.
 
@@ -42,6 +42,10 @@ No se pudo iniciar la aplicación
 Cannot read properties of null (reading 'addEventListener')
 ```
 
+Algo parecido ocurre con la pestaña **Carga múltiple**: si `ClientCore.html` ya
+muestra la pestaña pero `Index.html` no trae la sección `#page-batch`, la pantalla
+sale vacía (el cliente no engancha nada para no romper el arranque).
+
 Antes de avisar que el cambio está listo, comparar el proyecto remoto con el
 local (solo lectura, en una carpeta temporal):
 
@@ -53,7 +57,7 @@ Copy-Item .clasp.json, .claspignore $d
 cd $d; clasp -u hrosas pull -f
 cd c:\GAS\TimeSheet
 foreach ($f in 'Index.html','Styles.html','ClientApp.html','ClientCore.html',
-               'ClientTables.html','ClientTime.html','Code.gs','Api.gs') {
+               'ClientBulk.html','ClientTables.html','ClientTime.html','Code.gs','Api.gs') {
   $a = Join-Path $d $f
   $norm = { param($p) ([IO.File]::ReadAllText($p)).Replace("`r`n","`n").TrimEnd() }
   "$f -> $(if ((& $norm $a) -eq (& $norm (Join-Path (Get-Location) $f))) { 'IGUAL' } else { 'DIFERENTE' })"
@@ -138,5 +142,5 @@ y reemplazar el `href` del `<link type="image/svg+xml">` en `Index.html`.
 ## Pruebas locales antes de cada push
 
 ```powershell
-node tests/client.smoke.js   # 107 comprobaciones del cliente (debe salir EXIT=0)
+node tests/client.smoke.js   # 133 comprobaciones del cliente (debe salir EXIT=0)
 ```

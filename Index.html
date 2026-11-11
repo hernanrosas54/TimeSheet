@@ -210,6 +210,63 @@
 
 
 
+      <!-- ================================================ Carga múltiple -->
+      <section id="page-batch" class="hidden">
+        <div class="mb-3">
+          <h1 class="text-base font-semibold text-slate-900">Carga múltiple</h1>
+          <p class="text-xs text-slate-500">Registra varios bloques del mismo día de una sola vez.</p>
+        </div>
+
+        <form id="batchForm" class="card p-4 sm:p-5" autocomplete="off" novalidate>
+          <div class="flex flex-wrap items-end gap-3 border-b border-slate-100 pb-4">
+            <div class="min-w-[10rem]">
+              <label class="label" for="batchDate">Fecha de los registros <span class="text-rose-500">*</span></label>
+              <input id="batchDate" type="date" class="input">
+            </div>
+            <div class="flex items-center gap-2 pb-1">
+              <button id="btnBatchToday" type="button" class="btn btn-ghost btn-sm">Hoy</button>
+              <span id="batchDateWarning" class="badge badge-off hidden">Fecha distinta a hoy</span>
+            </div>
+            <div class="ml-auto flex flex-wrap items-center gap-2 pb-1">
+              <span id="batchSummary" class="badge">0 líneas completas</span>
+              <button id="btnBatchAddRow" type="button" class="btn btn-ghost btn-sm">＋ Agregar línea</button>
+              <button id="btnBatchClear" type="button" class="btn btn-ghost btn-sm">Vaciar líneas</button>
+            </div>
+          </div>
+
+          <p class="mt-3 text-xs text-slate-500">
+            Llena una línea por cada bloque de trabajo. Al completar la <strong>hora de fin</strong>
+            se copia como <strong>hora de inicio</strong> de la línea siguiente (si esa hora está vacía).
+            Las líneas vacías se ignoran, las horas se redondean a <?= roundMinutes ?> minutos y todos
+            los registros se guardan con la fecha del encabezado. Las <strong>observaciones</strong> son
+            opcionales.
+          </p>
+
+          <div class="mt-4">
+            <div class="batch-head" aria-hidden="true">
+              <span>#</span>
+              <span>Hora inicio</span>
+              <span>Hora fin</span>
+              <span>Proyecto</span>
+              <span>Tipo de actividad</span>
+              <span>Actividad</span>
+              <span>Observaciones</span>
+              <span></span>
+            </div>
+            <div id="batchRows"></div>
+          </div>
+
+          <p id="batchFormError" class="mt-4 hidden rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700"></p>
+
+          <div class="mt-4 flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center">
+            <p class="mr-auto text-xs text-slate-500">
+              Se guarda una línea por llamada; si alguna falla, las demás se conservan.
+            </p>
+            <button id="btnBatchSave" type="submit" class="btn btn-primary">Guardar líneas</button>
+          </div>
+        </form>
+      </section>
+
       <!-- ================================================ Mantenimiento de tablas -->
       <section id="page-table" class="hidden">
         <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -271,6 +328,7 @@
 
   <?!= include('ClientCore'); ?>
   <?!= include('ClientTime'); ?>
+  <?!= include('ClientBulk'); ?>
   <?!= include('ClientTables'); ?>
   <?!= include('ClientApp'); ?>
 </body>

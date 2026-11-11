@@ -336,6 +336,132 @@
     opacity: 1;
   }
 
+  /* ------------------------------------------------ Captura múltiple */
+  .batch-head {
+    display: none;
+  }
+
+  .batch-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding: 0.65rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    background: #ffffff;
+  }
+
+  .batch-row + .batch-row {
+    margin-top: 0.5rem;
+  }
+
+  .batch-index {
+    order: -2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: #3730a3;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .batch-clear {
+    order: -1;
+    justify-self: end;
+  }
+
+  .batch-cell {
+    min-width: 0;
+  }
+
+  .batch-cell-wide {
+    grid-column: 1 / -1;
+  }
+
+  .batch-field-label {
+    display: block;
+    margin-bottom: 0.2rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  .batch-row-error {
+    grid-column: 1 / -1;
+    margin-top: 0.15rem;
+    border-radius: 0.5rem;
+    background: #fff1f2;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.78rem;
+    color: #be123c;
+  }
+
+  .batch-row.is-invalid {
+    border-color: #fecdd3;
+    background: #fffafa;
+  }
+
+  @media (min-width: 1024px) {
+    .batch-head,
+    .batch-row {
+      display: grid;
+      grid-template-columns: 2rem 5.5rem 5.5rem minmax(9rem, 1.4fr) minmax(7.5rem, 1fr) minmax(9rem, 1.3fr) minmax(8rem, 1fr) 2rem;
+      gap: 0.5rem;
+      align-items: start;
+    }
+
+    .batch-head {
+      padding: 0 0.6rem 0.4rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+
+    .batch-row {
+      padding: 0.5rem 0.6rem;
+      border: 0;
+      border-top: 1px solid #e2e8f0;
+      border-radius: 0;
+    }
+
+    .batch-row + .batch-row {
+      margin-top: 0;
+    }
+
+    .batch-index,
+    .batch-clear {
+      order: 0;
+    }
+
+    .batch-index {
+      margin-top: 0.15rem;
+    }
+
+    .batch-cell-wide {
+      grid-column: auto;
+    }
+
+    .batch-field-label {
+      display: none;
+    }
+
+    .batch-row-error {
+      margin-top: 0;
+    }
+
+    .batch-row.is-invalid {
+      background: #fff7f8;
+    }
+  }
+
   /* ------------------------------------------------ Modales y avisos */
   .modal-backdrop {
     position: fixed;

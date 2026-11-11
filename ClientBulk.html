@@ -1,0 +1,637 @@
+<script>
+/**
+ * Pantalla de captura múltiple.
+ *
+ * Muestra varias líneas (seis por defecto) para registrar de una sola vez los
+ * bloques de trabajo de una misma fecha. La fecha se elige en el encabezado de
+ * la pantalla y cada línea tiene hora de inicio, hora de fin, proyecto, tipo de
+ * actividad, actividad y observaciones. Al completar la hora de fin de una
+ * línea se copia como hora de inicio de la siguiente (solo si esa hora está
+ * vacía).
+ *
+ * Usa el mismo apiSaveTimeEntry que la pantalla individual, una llamada por
+ * línea, para no depender de una versión nueva de Api.gs.
+ */
+window.BulkPage = (function () {
+  const DEFAULT_ROWS = 6;
+  const MAX_ROWS = 20;
+
+  const state = {
+    rows: [],
+    bound: false,
+    saving: false
+  };
+
+  function el(id) {
+    return document.getElementById(id);
+  }
+
+  function roundStep() {
+    return Number(Core.state.app.roundMinutes) || 10;
+  }
+
+  function projectItems() {
+    return (Core.state.projects || []).map(function (project) {
+      const metaParts = [];
+      if (project.cliente) metaParts.push(project.cliente);
+      if (!project.activo) metaParts.push('inactivo');
+      return {
+        value: project.numero,
+        label: project.numero + ' · ' + project.nombre,
+        search: [project.numero, project.nombre, project.cliente].join(' '),
+        meta: metaParts.join(' · '),
+        activo: project.activo,
+        cliente: project.cliente,
+        nombre: project.nombre
+      };
+    });
+  }
+
+  function typeItems() {
+    return (Core.state.activityTypes || []).map(function (tipo) {
+      return { value: tipo, label: tipo, search: tipo };
+    });
+  }
+
+  /* ------------------------------------------------------------ Filas */
+  /** Marcado de una línea. Los ids llevan el índice para poder engancharla. */
+  function rowHtml(index) {
+    const n = index + 1;
+    return '<div class="batch-row" id="batchRow' + index + '">' +
+      '<span class="batch-index" aria-hidden="true">' + n + '</span>' +
+      '<div class="batch-cell">' +
+        '<label class="batch-field-label" for="batchStart' + index + '">Hora inicio</label>' +
+        '<input id="batchStart' + index + '" type="time" step="600" class="input" autocomplete="off">' +
+      '</div>' +
+      '<div class="batch-cell">' +
+        '<label class="batch-field-label" for="batchEnd' + index + '">Hora fin</label>' +
+        '<input id="batchEnd' + index + '" type="time" step="600" class="input" autocomplete="off">' +
+      '</div>' +
+      '<div class="batch-cell batch-cell-wide">' +
+        '<label class="batch-field-label" for="batchProject' + index + '">Proyecto</label>' +
+        '<div class="relative">' +
+          '<input id="batchProject' + index + '" type="text" class="input" placeholder="Número o nombre"' +
+            ' role="combobox" aria-expanded="false" aria-controls="batchProjectList' + index + '"' +
+            ' aria-autocomplete="list" autocomplete="off">' +
+          '<ul id="batchProjectList' + index + '" class="combo-list hidden" role="listbox"></ul>' +
+        '</div>' +
+      '</div>' +
+      '<div class="batch-cell batch-cell-wide">' +
+        '<label class="batch-field-label" for="batchType' + index + '">Tipo de actividad</label>' +
+        '<div class="relative">' +
+          '<input id="batchType' + index + '" type="text" class="input" placeholder="Tipo"' +
+            ' role="combobox" aria-expanded="false" aria-controls="batchTypeList' + index + '"' +
+            ' aria-autocomplete="list" autocomplete="off">' +
+          '<ul id="batchTypeList' + index + '" class="combo-list hidden" role="listbox"></ul>' +
+        '</div>' +
+      '</div>' +
+      '<div class="batch-cell batch-cell-wide">' +
+        '<label class="batch-field-label" for="batchActivity' + index + '">Actividad</label>' +
+        '<input id="batchActivity' + index + '" type="text" class="input" maxlength="300"' +
+          ' placeholder="¿Qué hiciste en ese tiempo?" autocomplete="off">' +
+      '</div>' +
+      '<div class="batch-cell batch-cell-wide">' +
+        '<label class="batch-field-label" for="batchNotes' + index + '">Observaciones</label>' +
+        '<input id="batchNotes' + index + '" type="text" class="input" maxlength="300"' +
+          ' placeholder="Opcional" autocomplete="off">' +
+      '</div>' +
+      '<button type="button" class="btn btn-ghost btn-icon batch-clear" data-clear-row="' + index + '"' +
+        ' title="Vaciar la línea ' + n + '" aria-label="Vaciar la línea ' + n + '">×</button>' +
+      '<p id="batchError' + index + '" class="batch-row-error hidden" role="alert"></p>' +
+    '</div>';
+  }
+
+  /** Referencias a los controles de una línea recién insertada. */
+  function readRowElements(index) {
+    return {
+      index: index,
+      rootEl: el('batchRow' + index),
+      startEl: el('batchStart' + index),
+      endEl: el('batchEnd' + index),
+      projectEl: el('batchProject' + index),
+      projectListEl: el('batchProjectList' + index),
+      typeEl: el('batchType' + index),
+      typeListEl: el('batchTypeList' + index),
+      activityEl: el('batchActivity' + index),
+      notesEl: el('batchNotes' + index),
+      errorEl: el('batchError' + index),
+      projectCombo: null,
+      typeCombo: null
+    };
+  }
+
+  function appendRowHtml(host, index) {
+    if (typeof host.insertAdjacentHTML === 'function') {
+      host.insertAdjacentHTML('beforeend', rowHtml(index));
+    } else {
+      // Respaldo para el DOM simulado de las pruebas.
+      host.innerHTML += rowHtml(index);
+    }
+  }
+
+  function buildRows(count) {
+    const host = el('batchRows');
+    if (!host) return;
+
+    state.rows = [];
+    host.innerHTML = '';
+
+    for (let i = 0; i < count; i++) {
+      appendRowHtml(host, i);
+      const row = readRowElements(i);
+      wireRow(row);
+      state.rows.push(row);
+    }
+  }
+
+  function wireRow(row) {
+    row.projectCombo = Core.createCombobox({
+      input: row.projectEl,
+      list: row.projectListEl,
+      emptyText: 'No hay proyectos que coincidan',
+      onSelect: function () {
+        row.projectEl.classList.remove('is-invalid');
+        updateSummary();
+      },
+      onClear: function () {}
+    });
+    row.projectCombo.setItems(projectItems());
+
+    row.typeCombo = Core.createCombobox({
+      input: row.typeEl,
+      list: row.typeListEl,
+      emptyText: 'Tipo no encontrado',
+      onSelect: function () {
+        row.typeEl.classList.remove('is-invalid');
+        updateSummary();
+      },
+      onClear: function () {}
+    });
+    row.typeCombo.setItems(typeItems());
+
+    row.startEl.addEventListener('change', updateSummary);
+    row.startEl.addEventListener('blur', function () {
+      const rounded = Core.roundToStep(row.startEl.value, roundStep());
+      if (rounded) row.startEl.value = rounded;
+      updateSummary();
+    });
+
+    row.endEl.addEventListener('change', function () {
+      handleEnd(row);
+    });
+    row.endEl.addEventListener('blur', function () {
+      handleEnd(row);
+    });
+
+    row.projectEl.addEventListener('input', updateSummary);
+    row.typeEl.addEventListener('input', updateSummary);
+    row.activityEl.addEventListener('input', updateSummary);
+    row.notesEl.addEventListener('input', updateSummary);
+
+    // Enter avanza al control siguiente, como en la pantalla individual.
+    row.startEl.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        row.endEl.focus();
+      }
+    });
+    row.endEl.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        row.projectEl.focus();
+      }
+    });
+    row.activityEl.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        const next = state.rows[row.index + 1];
+        if (next) next.startEl.focus();
+      }
+    });
+  }
+
+  /**
+   * Redondea la hora de fin y, si la línea siguiente no tiene hora de inicio,
+   * la inicializa con ese valor (encadenado de bloques).
+   */
+  function handleEnd(row) {
+    const rounded = Core.roundToStep(row.endEl.value, roundStep());
+    if (rounded) row.endEl.value = rounded;
+    row.endEl.classList.remove('is-invalid');
+
+    const next = state.rows[row.index + 1];
+    if (next && rounded && !String(next.startEl.value || '').trim()) {
+      next.startEl.value = rounded;
+      next.startEl.classList.remove('is-invalid');
+    }
+
+    updateSummary();
+  }
+
+  function rawValues(row) {
+    return {
+      start: String(row.startEl.value || '').trim(),
+      end: String(row.endEl.value || '').trim(),
+      project: String(row.projectEl.value || '').trim(),
+      type: String(row.typeEl.value || '').trim(),
+      activity: String(row.activityEl.value || '').trim(),
+      notes: String(row.notesEl.value || '').trim()
+    };
+  }
+
+  function isEmptyRow(row) {
+    const values = rawValues(row);
+    return !values.start && !values.end && !values.project && !values.type && !values.activity && !values.notes;
+  }
+
+  function setRowError(row, message) {
+    if (!row || !row.errorEl) return;
+    row.errorEl.textContent = message || '';
+    row.errorEl.classList.toggle('hidden', !message);
+    if (row.rootEl && row.rootEl.classList) row.rootEl.classList.toggle('is-invalid', !!message);
+  }
+
+  function clearRowValidation(row) {
+    [row.startEl, row.endEl, row.projectEl, row.typeEl, row.activityEl, row.notesEl].forEach(function (input) {
+      if (input && input.classList) input.classList.remove('is-invalid');
+    });
+    setRowError(row, '');
+  }
+
+  function resetRow(row) {
+    if (!row) return;
+    row.startEl.value = '';
+    row.endEl.value = '';
+    row.activityEl.value = '';
+    row.notesEl.value = '';
+    row.projectCombo.clear();
+    row.typeCombo.clear();
+    clearRowValidation(row);
+  }
+
+  function focusRow(index) {
+    const row = state.rows[index];
+    if (!row) return;
+    if (row.rootEl && typeof row.rootEl.scrollIntoView === 'function') {
+      row.rootEl.scrollIntoView({ block: 'nearest' });
+    }
+    row.startEl.focus();
+  }
+
+  function focusError(index) {
+    const row = state.rows[index];
+    if (!row) return;
+    const target = [row.startEl, row.endEl, row.projectEl, row.typeEl, row.activityEl, row.notesEl].filter(function (input) {
+      return input && input.classList && input.classList.contains('is-invalid');
+    })[0] || row.startEl;
+    if (row.rootEl && typeof row.rootEl.scrollIntoView === 'function') {
+      row.rootEl.scrollIntoView({ block: 'center' });
+    }
+    target.focus();
+  }
+
+  function showError(message) {
+    const box = el('batchFormError');
+    if (!box) return;
+    if (!message) {
+      box.textContent = '';
+      box.classList.add('hidden');
+      return;
+    }
+    box.textContent = message;
+    box.classList.remove('hidden');
+  }
+
+  /** Resumen de las líneas con un rango de horas válido. */
+  function updateSummary() {
+    const summary = el('batchSummary');
+    let count = 0;
+    let minutes = 0;
+
+    state.rows.forEach(function (row) {
+      const values = rawValues(row);
+      const start = Core.roundToStep(values.start, roundStep());
+      const end = Core.roundToStep(values.end, roundStep());
+      if (start && end && Core.timeToMinutes(end) > Core.timeToMinutes(start)) {
+        count += 1;
+        minutes += Core.timeToMinutes(end) - Core.timeToMinutes(start);
+      }
+    });
+
+    if (summary) {
+      summary.textContent = count + ' línea' + (count === 1 ? '' : 's') + ' completa' +
+        (count === 1 ? '' : 's') + (count ? ' · ' + Core.formatMinutes(minutes) : '');
+      summary.className = 'badge' + (count ? ' badge-ok' : '');
+    }
+
+    const warning = el('batchDateWarning');
+    const date = el('batchDate');
+    if (warning) {
+      warning.classList.toggle('hidden', !date || date.value === Core.todayIso());
+    }
+  }
+
+  /* ------------------------------------------------------ Validación */
+  /** Devuelve el primer solapamiento entre líneas ya validadas. */
+  function findOverlap(items) {
+    const ordered = items.slice().sort(function (a, b) {
+      return Core.timeToMinutes(a.start) - Core.timeToMinutes(b.start);
+    });
+
+    for (let i = 1; i < ordered.length; i++) {
+      const previous = ordered[i - 1];
+      const current = ordered[i];
+      if (Core.timeToMinutes(current.start) < Core.timeToMinutes(previous.end)) {
+        return {
+          row: current.row,
+          message: 'Línea ' + (current.row + 1) + ': se solapa con la línea ' + (previous.row + 1) +
+            ' (' + previous.start + '–' + previous.end + ').'
+        };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Revisa las líneas y arma el plan de guardado. Las líneas vacías se ignoran;
+   * las incompletas o inválidas quedan marcadas y no se envían.
+   */
+  function collect() {
+    const dateInput = el('batchDate');
+    const fecha = dateInput ? String(dateInput.value || '').trim() : '';
+    const items = [];
+    const errors = [];
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      showError('Selecciona la fecha de los registros.');
+      return { fecha: '', items: items, errors: [{ row: null, message: 'Selecciona la fecha de los registros.' }] };
+    }
+
+    state.rows.forEach(function (row) {
+      clearRowValidation(row);
+      if (isEmptyRow(row)) return;
+
+      const values = rawValues(row);
+      const project = row.projectCombo.resolve();
+      const type = row.typeCombo.resolve();
+      const start = Core.roundToStep(values.start, roundStep());
+      const end = Core.roundToStep(values.end, roundStep());
+      const label = 'Línea ' + (row.index + 1) + ': ';
+      let message = '';
+
+      if (!project) {
+        message = label + 'elige un proyecto de la lista.';
+        row.projectEl.classList.add('is-invalid');
+      } else if (project.activo === false) {
+        message = label + 'el proyecto ' + project.value + ' está inactivo.';
+      } else if (!type) {
+        message = label + 'elige un tipo de actividad de la lista.';
+        row.typeEl.classList.add('is-invalid');
+      } else if (!start) {
+        message = label + 'indica la hora de inicio.';
+        row.startEl.classList.add('is-invalid');
+      } else if (!end) {
+        message = label + 'indica la hora de finalización.';
+        row.endEl.classList.add('is-invalid');
+      } else if (Core.timeToMinutes(end) <= Core.timeToMinutes(start)) {
+        message = label + 'la hora fin (' + end + ') debe ser mayor que la hora inicio (' + start + ').';
+        row.endEl.classList.add('is-invalid');
+      } else if (!values.activity) {
+        message = label + 'escribe la actividad realizada.';
+        row.activityEl.classList.add('is-invalid');
+      }
+
+      if (message) {
+        errors.push({ row: row.index, message: message });
+        setRowError(row, message);
+        return;
+      }
+
+      items.push({
+        row: row.index,
+        start: start,
+        end: end,
+        payload: {
+          proyecto: project.value,
+          tipoActividad: type.value,
+          actividad: values.activity,
+          observaciones: values.notes,
+          fecha: fecha,
+          horaInicio: start,
+          horaFin: end
+        }
+      });
+    });
+
+    const overlap = findOverlap(items);
+    if (overlap) {
+      errors.push(overlap);
+      setRowError(state.rows[overlap.row], overlap.message);
+    }
+
+    return { fecha: fecha, items: items, errors: errors };
+  }
+
+  /* -------------------------------------------------------- Guardado */
+  async function save() {
+    if (state.saving || !state.bound) return;
+
+    showError('');
+    const plan = collect();
+
+    if (plan.errors.length) {
+      if (plan.errors.length === 1) {
+        showError(plan.errors[0].message);
+      } else {
+        showError('Hay ' + plan.errors.length + ' líneas con errores: corrige las marcadas en rojo.');
+      }
+      if (plan.errors[0].message) Core.toast(plan.errors[0].message, 'error', 8000);
+      focusError(plan.errors[0].row);
+      return;
+    }
+
+    if (!plan.items.length) {
+      showError('Llena al menos una línea con horas, proyecto, tipo de actividad y actividad.');
+      focusRow(0);
+      return;
+    }
+
+    const button = el('btnBatchSave');
+    const saved = [];
+    const failed = [];
+
+    state.saving = true;
+    Core.setBusy(button, true, 'Guardando…');
+
+    for (let i = 0; i < plan.items.length; i++) {
+      const item = plan.items[i];
+      if (button) button.textContent = 'Guardando ' + (i + 1) + ' de ' + plan.items.length + '…';
+      try {
+        const result = await Core.call('apiSaveTimeEntry', item.payload);
+        saved.push({ item: item, entry: (result && result.entry) || {} });
+      } catch (error) {
+        failed.push({ item: item, message: error.message });
+        setRowError(state.rows[item.row], 'Línea ' + (item.row + 1) + ': ' + error.message);
+      }
+    }
+
+    state.saving = false;
+    Core.setBusy(button, false);
+
+    if (saved.length) {
+      const last = saved[saved.length - 1];
+      const lastIndex = last.item.row;
+      const lastEnd = last.entry.horaFin || last.item.end;
+
+      saved.forEach(function (item) {
+        resetRow(state.rows[item.item.row]);
+      });
+
+      // Si todo se guardó, la primera línea libre continúa a la hora final.
+      if (!failed.length) {
+        const next = state.rows[lastIndex + 1] || state.rows[0];
+        if (next && !String(next.startEl.value || '').trim()) next.startEl.value = lastEnd;
+      }
+
+      updateSummary();
+    }
+
+    if (failed.length) {
+      showError('No se pudieron guardar ' + failed.length + ' de ' + plan.items.length +
+        ' líneas. ' + failed[0].message);
+      Core.toast('Se guardaron ' + saved.length + ' de ' + plan.items.length +
+        ' líneas. Revisa las marcadas en rojo.', 'error', 9000);
+      focusError(failed[0].item.row);
+    } else {
+      const minutes = saved.reduce(function (sum, item) {
+        return sum + (Number(item.entry.minutos) || 0);
+      }, 0);
+      Core.toast('Guardados ' + saved.length + ' registro' + (saved.length === 1 ? '' : 's') +
+        ' del ' + Core.formatDateEs(plan.fecha) + ' · ' + Core.formatMinutes(minutes) + '.',
+        'success', 6000);
+      focusRow(0);
+    }
+
+    if (window.TimePage && el('entryDate') && el('entryDate').value === plan.fecha) {
+      TimePage.loadDay();
+    }
+  }
+
+  /* ------------------------------------------------- Líneas de la tabla */
+  function addRow() {
+    if (!state.bound) return;
+    if (state.rows.length >= MAX_ROWS) {
+      Core.toast('Máximo ' + MAX_ROWS + ' líneas por carga.', 'error');
+      return;
+    }
+
+    const host = el('batchRows');
+    if (!host) return;
+
+    const index = state.rows.length;
+    appendRowHtml(host, index);
+
+    const row = readRowElements(index);
+    const previous = state.rows[index - 1];
+    if (previous) {
+      const end = Core.roundToStep(previous.endEl.value, roundStep());
+      if (end) row.startEl.value = end;
+    }
+
+    wireRow(row);
+    state.rows.push(row);
+    updateSummary();
+    row.projectEl.focus();
+  }
+
+  function clearAll() {
+    if (!state.bound) return;
+    buildRows(DEFAULT_ROWS);
+    showError('');
+    updateSummary();
+    Core.toast('Líneas vaciadas.', 'info');
+    focusRow(0);
+  }
+
+  /* ------------------------------------------------------------- Arranque */
+  function refresh() {
+    if (!state.bound) return;
+
+    const date = el('batchDate');
+    if (date && !date.value) {
+      date.value = Core.state.defaults.fecha || Core.todayIso();
+    }
+
+    const projects = projectItems();
+    const types = typeItems();
+    state.rows.forEach(function (row) {
+      row.projectCombo.setItems(projects);
+      row.typeCombo.setItems(types);
+    });
+
+    updateSummary();
+  }
+
+  function init() {
+    if (state.bound) return;
+
+    const host = el('batchRows');
+    // Si el Index.html servido es de una versión anterior no hay pantalla de
+    // captura múltiple: no se engancha nada para no romper el arranque.
+    if (!host) return;
+
+    state.bound = true;
+    buildRows(DEFAULT_ROWS);
+
+    const form = el('batchForm');
+    if (form) {
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        save();
+      });
+    }
+
+    const date = el('batchDate');
+    if (date) date.addEventListener('change', updateSummary);
+
+    const today = el('btnBatchToday');
+    if (today) {
+      today.addEventListener('click', function () {
+        if (date) date.value = Core.todayIso();
+        updateSummary();
+        if (date) date.focus();
+      });
+    }
+
+    const add = el('btnBatchAddRow');
+    if (add) add.addEventListener('click', addRow);
+
+    const clear = el('btnBatchClear');
+    if (clear) clear.addEventListener('click', clearAll);
+
+    host.addEventListener('click', function (event) {
+      const target = event.target && typeof event.target.closest === 'function' ? event.target : null;
+      if (!target) return;
+      const button = target.closest('[data-clear-row]');
+      if (!button) return;
+      const row = state.rows[Number(button.dataset.clearRow)];
+      if (row) {
+        resetRow(row);
+        updateSummary();
+      }
+    });
+
+    refresh();
+  }
+
+  return {
+    init: init,
+    refresh: refresh,
+    save: save,
+    addRow: addRow,
+    clearAll: clearAll,
+    collect: collect,
+    state: state
+  };
+})();
+</script>

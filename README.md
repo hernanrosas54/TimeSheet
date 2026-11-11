@@ -18,6 +18,14 @@ Usuarios y Tipos de Actividad).
   carga el formulario completo (proyecto, tipo, actividad, observaciones, fecha y
   horas); al guardar se actualiza esa fila de `Tiempos` en lugar de crear otra.
   Una banda ámbar avisa de que se está editando y permite cancelar.
+- **Carga múltiple** para capturar de una vez varios bloques de trabajo del mismo
+  día (útil cuando los registros se anotan al final de la jornada). La fecha se
+  elige en el encabezado y hay seis líneas —hasta 20— con hora de inicio, hora
+  de fin, proyecto, tipo de actividad, actividad y observaciones. Al completar la
+  hora de fin se copia como hora de inicio de la línea siguiente (si está vacía),
+  las horas se redondean al paso configurado y las líneas vacías se ignoran. Se
+  validan líneas incompletas, proyectos inactivos y solapamientos antes de
+  guardar, una línea por llamada a `apiSaveTimeEntry`.
 - **Proyectos** con las horas dedicadas en el mes, en el mes anterior y en el año,
   calculadas desde la hoja `Tiempos` (no se almacenan). Los encabezados
   **Horas Mes**, **Horas Mes Anterior** y **Horas Año** se ordenan al hacer clic:
@@ -50,6 +58,7 @@ Usuarios y Tipos de Actividad).
 | `ClientCore.html` | Estado, utilidades y mensajes del cliente. |
 | `ClientApp.html` | Arranque, identificación, pestañas y catálogos. |
 | `ClientTime.html` | Registro de horas del día. |
+| `ClientBulk.html` | Captura múltiple: varios bloques del mismo día en una sola pantalla. |
 | `ClientTables.html` | Listado y edición de las tablas maestras y detalle (drill down) de proyectos. |
 | `tests/` | Pruebas del cliente en Node (`node tests/client.smoke.js`). |
 | `assets/favicon.svg` | Fuente editable del icono (no se sube a Apps Script). |
@@ -58,8 +67,8 @@ Usuarios y Tipos de Actividad).
 ## Puesta en marcha
 
 ```powershell
-clasp -u hrosas push -f                         # sube los 14 archivos del proyecto
-node tests/client.smoke.js                      # 107 comprobaciones del cliente
+clasp -u hrosas push -f                         # sube los 15 archivos del proyecto
+node tests/client.smoke.js                      # 133 comprobaciones del cliente
 ```
 
 Tras el push, ejecutar `setupTimeSheet` una vez en el editor de Apps Script y

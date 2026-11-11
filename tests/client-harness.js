@@ -46,6 +46,9 @@ class FakeElement {
   setAttribute(name, value) { this.attributes[name] = String(value); }
   getAttribute(name) { return this.attributes[name] === undefined ? null : this.attributes[name]; }
   appendChild(child) { this.children.push(child); return child; }
+  insertAdjacentHTML(position, html) {
+    if (position === 'beforeend') this.innerHTML += html;
+  }
   remove() {}
   focus() {}
   blur() {}
@@ -332,7 +335,7 @@ function loadPartial(file) {
   vm.runInContext(match[1], context, { filename: file });
 }
 
-['ClientCore.html', 'ClientTime.html', 'ClientTables.html', 'ClientApp.html'].forEach(loadPartial);
+['ClientCore.html', 'ClientTime.html', 'ClientBulk.html', 'ClientTables.html', 'ClientApp.html'].forEach(loadPartial);
 
 const tick = (ms) => new Promise((resolve) => setTimeout(resolve, ms || 60));
 const evalIn = (code) => vm.runInContext(code, context, { filename: 'eval' });

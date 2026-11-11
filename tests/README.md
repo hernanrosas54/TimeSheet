@@ -1,8 +1,8 @@
 # Pruebas del cliente
 
 `client.smoke.js` ejecuta los parciales `ClientCore.html`, `ClientTime.html`,
-`ClientTables.html` y `ClientApp.html` en Node con un DOM simulado y un
-`google.script.run` falso (sin dependencias externas).
+`ClientBulk.html`, `ClientTables.html` y `ClientApp.html` en Node con un DOM
+simulado y un `google.script.run` falso (sin dependencias externas).
 
 ```powershell
 node tests/client.smoke.js
@@ -22,6 +22,10 @@ Comprueba, entre otras cosas:
   actualizar esa fila y permite cancelar la edición sin guardar nada.
 - Botón **Ahora** junto a la hora de inicio: rellena la hora actual redondeada al
   paso configurado.
+- Carga múltiple: seis líneas (hasta 20), fecha común, encadenado de la hora fin
+  a la hora inicio siguiente, redondeo, resumen de líneas completas y guardado
+  secuencial con `apiSaveTimeEntry`; se validan líneas incompletas, proyectos
+  inactivos y solapamientos, y se ignoran las líneas vacías.
 - Listado de tablas con el nombre como enlace de edición (sin botones de alta
   baja), columnas calculadas de horas por proyecto y alta de registros desde el
   diálogo con validación de campos obligatorios.
@@ -33,5 +37,5 @@ Comprueba, entre otras cosas:
   100, incluido el aviso cuando un proyecto no tiene registros.
 - Listado de registros de tiempo con filtros y cambio de usuario.
 
-Salida esperada: `Todas las comprobaciones pasaron.` (107 comprobaciones) y código
+Salida esperada: `Todas las comprobaciones pasaron.` (133 comprobaciones) y código
 de salida 0.
