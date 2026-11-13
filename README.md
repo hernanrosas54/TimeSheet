@@ -8,8 +8,9 @@ Usuarios y Tipos de Actividad).
 ## Características
 
 - **Registro de horas** por día, con vista previa de duración, totales y filtros.
-  El botón **Ahora** junto a *Hora inicio* (y a *Hora fin*) rellena la hora actual
-  redondeada al paso configurado.
+  El botón **Ahora** junto a *Hora inicio* rellena la hora de inicio con la hora
+  actual redondeada al paso configurado y no toca la *hora fin*, que se escribe
+  al terminar (si queda vacía, la vista previa toma la hora actual).
 - **Panel de registros del día** ordenado de la hora más reciente a la más antigua.
   Cada registro tiene un botón **⧉ Copiar** que lleva al formulario su proyecto,
   tipo de actividad y actividad, para retomar un trabajo ya iniciado sin volver a
@@ -68,7 +69,7 @@ Usuarios y Tipos de Actividad).
 
 ```powershell
 clasp -u hrosas push -f                         # sube los 15 archivos del proyecto
-node tests/client.smoke.js                      # 133 comprobaciones del cliente
+node tests/client.smoke.js                      # 135 comprobaciones del cliente
 ```
 
 Tras el push, ejecutar `setupTimeSheet` una vez en el editor de Apps Script y

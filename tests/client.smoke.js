@@ -20,6 +20,7 @@ const { context, get, calls, check, failures, tick } = env;
   const index = fs.readFileSync(path.join(root, 'Index.html'), 'utf8');
   const unresolved = Array.from(used).filter((id) => !dynamic.has(id) && index.indexOf('id="' + id + '"') === -1);
   check('ids del JS presentes en Index.html', unresolved.length === 0, unresolved.join(', '));
+  check('sin boton duplicado de hora actual', index.indexOf('id="btnNow"') === -1);
 
   // 1) Arranque: identificacion por correo y pantalla principal.
   await tick(120);
@@ -153,6 +154,7 @@ const { context, get, calls, check, failures, tick } = env;
   get('btnStartNow').dispatch('click');
   check('boton Ahora rellena la hora de inicio', get('startTime').value === expectedNow, get('startTime').value + ' != ' + expectedNow);
   check('hora del boton redondeada a 10 min', /^([01]\d|2[0-3]):[0-5]0$/.test(get('startTime').value), get('startTime').value);
+  check('el boton Ahora no toca la hora de fin', get('endTime').value === '09:35', get('endTime').value);
 
   // 4) Guardado correcto.
   const before = calls.length;

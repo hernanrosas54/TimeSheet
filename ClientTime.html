@@ -92,13 +92,6 @@ window.TimePage = (function () {
       updatePreview();
     });
 
-    el('btnNow').addEventListener('click', function () {
-      const now = Core.currentRoundedTime(roundStep());
-      el('endTime').value = now;
-      if (!el('startTime').value) el('startTime').value = now;
-      updatePreview();
-    });
-
     el('btnReset').addEventListener('click', function () {
       resetForm(true);
     });

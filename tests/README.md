@@ -20,8 +20,9 @@ Comprueba, entre otras cosas:
 - Botón **Editar** de cada registro: carga el registro completo en el formulario
   (fecha, horas y observaciones incluidas), envía `_row` al guardar para
   actualizar esa fila y permite cancelar la edición sin guardar nada.
-- Botón **Ahora** junto a la hora de inicio: rellena la hora actual redondeada al
-  paso configurado.
+- Botón **Ahora** junto a la hora de inicio (único botón de hora actual): rellena
+  la hora de inicio con la hora actual redondeada al paso configurado y deja
+  intacta la hora de finalización.
 - Carga múltiple: seis líneas (hasta 20), fecha común, encadenado de la hora fin
   a la hora inicio siguiente, redondeo, resumen de líneas completas y guardado
   secuencial con `apiSaveTimeEntry`; se validan líneas incompletas, proyectos
@@ -37,5 +38,5 @@ Comprueba, entre otras cosas:
   100, incluido el aviso cuando un proyecto no tiene registros.
 - Listado de registros de tiempo con filtros y cambio de usuario.
 
-Salida esperada: `Todas las comprobaciones pasaron.` (133 comprobaciones) y código
+Salida esperada: `Todas las comprobaciones pasaron.` (135 comprobaciones) y código
 de salida 0.

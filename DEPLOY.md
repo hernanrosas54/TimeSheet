@@ -142,5 +142,5 @@ y reemplazar el `href` del `<link type="image/svg+xml">` en `Index.html`.
 ## Pruebas locales antes de cada push
 
 ```powershell
-node tests/client.smoke.js   # 133 comprobaciones del cliente (debe salir EXIT=0)
+node tests/client.smoke.js   # 135 comprobaciones del cliente (debe salir EXIT=0)
 ```
