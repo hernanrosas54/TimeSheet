@@ -19,6 +19,12 @@ Usuarios y Tipos de Actividad).
   carga el formulario completo (proyecto, tipo, actividad, observaciones, fecha y
   horas); al guardar se actualiza esa fila de `Tiempos` en lugar de crear otra.
   Una banda ámbar avisa de que se está editando y permite cancelar.
+- **Atajos de actividades recurrentes**: el desplegable **⚡ Recurrente…** junto al
+  campo Proyecto carga de una sola vez el proyecto, el tipo de actividad y la
+  actividad de la fila elegida en la pestaña `Recurrentes` (columna A nombre,
+  B número de proyecto, D tipo de actividad y E actividad; la columna C se
+  ignora). La fecha y las horas del formulario no se tocan, y el desplegable se
+  llena en cada arranque con lo que haya en la hoja.
 - **Carga múltiple** para capturar de una vez varios bloques de trabajo del mismo
   día (útil cuando los registros se anotan al final de la jornada). La fecha se
   elige en el encabezado y hay seis líneas —hasta 20— con hora de inicio, hora
@@ -40,7 +46,8 @@ Usuarios y Tipos de Actividad).
 - **Edición de tablas** mediante el enlace del nombre; las columnas calculadas
   nunca se envían al servidor.
 - **Datos en Google Sheets**: el script crea la hoja `Control de Tiempo` con las
-  cinco tablas y guarda el `SPREADSHEET_ID` en las propiedades del script.
+  cinco tablas y guarda el `SPREADSHEET_ID` en las propiedades del script. Las
+  actividades frecuentes se editan a mano en la pestaña `Recurrentes`.
 - **Sin dependencias externas** en el cliente ni en las pruebas (DOM simulado).
 
 ## Estructura
@@ -69,7 +76,7 @@ Usuarios y Tipos de Actividad).
 
 ```powershell
 clasp -u hrosas push -f                         # sube los 15 archivos del proyecto
-node tests/client.smoke.js                      # 135 comprobaciones del cliente
+node tests/client.smoke.js                      # 143 comprobaciones del cliente
 ```
 
 Tras el push, ejecutar `setupTimeSheet` una vez en el editor de Apps Script y

@@ -126,6 +126,11 @@ function bootstrapData() {
       { numero: '16', nombre: 'Viejo', cliente: '', activo: false }
     ],
     activityTypes: ['Programacion', 'Analisis'],
+    // Atajos de la pestaña Recurrentes: nombre, proyecto, tipo y actividad.
+    recurrentes: [
+      { nombre: 'Revisión semanal', proyecto: '15', proyectoNombre: 'Sitio web', tipoActividad: 'Programacion', actividad: 'Revisión de sprint' },
+      { nombre: 'Soporte interno', proyecto: '16', proyectoNombre: 'Viejo', tipoActividad: 'Analisis', actividad: '' }
+    ],
     users: [{ codigo: 'JP', nombre: 'Juan Perez' }],
     defaults: { fecha: '2026-11-04', horaInicio: '09:30' }
   };

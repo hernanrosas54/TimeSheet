@@ -93,6 +93,11 @@ Todo debe salir `IGUAL`. Si alguno sale `DIFERENTE`, repetir
    el detalle del proyecto con esas tres cifras, los registros agrupados por mes
    (del actual hacia el pasado) y la paginación de 100 en 100. Si la flecha no
    aparece, el `Index.html`/`ClientTables.html` del despliegue está desactualizado.
+6. (Opcional) Crear la pestaña **`Recurrentes`** con los atajos de carga: columna
+   **A** nombre de la actividad, **B** número de proyecto, **C** libre, **D** tipo
+   de actividad y **E** actividad (puede quedar vacía). El desplegable
+   **⚡ Recurrente…** del formulario se llena con esas filas; si la hoja no existe
+   o está vacía, el desplegable queda deshabilitado y el resto funciona igual.
 
 ## Publicar cambios en la URL `/exec`
 
@@ -142,5 +147,5 @@ y reemplazar el `href` del `<link type="image/svg+xml">` en `Index.html`.
 ## Pruebas locales antes de cada push
 
 ```powershell
-node tests/client.smoke.js   # 135 comprobaciones del cliente (debe salir EXIT=0)
+node tests/client.smoke.js   # 143 comprobaciones del cliente (debe salir EXIT=0)
 ```

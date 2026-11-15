@@ -69,6 +69,27 @@ const { context, get, calls, check, failures, tick } = env;
   check('copiar el segundo registro', get('typeInput').value === 'Analisis' && get('activity').value === 'Revisión de backlog',
     get('typeInput').value + ' / ' + get('activity').value);
 
+  // 2b-bis) Atajo de actividades recurrentes (pestaña Recurrentes).
+  const recurringHtml = get('recurringSelect').innerHTML;
+  check('dropdown de recurrentes con opciones',
+    /Revisión semanal/.test(recurringHtml) && /Soporte interno/.test(recurringHtml), recurringHtml.slice(0, 200));
+  check('dropdown de recurrentes empieza vacio', get('recurringSelect').value === '', get('recurringSelect').value);
+
+  get('recurringSelect').value = '0';
+  get('recurringSelect').dispatch('change');
+  check('recurrente rellena el proyecto', get('projectInput').value === '15 · Sitio web', get('projectInput').value);
+  check('recurrente rellena el tipo de actividad', get('typeInput').value === 'Programacion', get('typeInput').value);
+  check('recurrente rellena la actividad', get('activity').value === 'Revisión de sprint', get('activity').value);
+  check('recurrente no toca las horas',
+    get('startTime').value === '09:30' && get('endTime').value === '',
+    get('startTime').value + ' / ' + get('endTime').value);
+
+  get('recurringSelect').value = '1';
+  get('recurringSelect').dispatch('change');
+  check('recurrente sin actividad deja la actividad vacia',
+    get('activity').value === '' && get('projectInput').value === '16 · Viejo',
+    get('activity').value + ' / ' + get('projectInput').value);
+
   // 2c) Boton editar: carga el registro completo en el formulario.
   const clickEdit = (index) => get('dayList').dispatch('click', {
     target: {
@@ -158,6 +179,7 @@ const { context, get, calls, check, failures, tick } = env;
 
   // 4) Guardado correcto.
   const before = calls.length;
+  get('recurringSelect').value = '0';
   get('projectInput').value = '15';
   get('typeInput').value = 'programacion';
   get('activity').value = 'Maquetado home';
@@ -178,6 +200,7 @@ const { context, get, calls, check, failures, tick } = env;
   }
   check('hora inicio avanza al fin', get('startTime').value === '09:00', get('startTime').value);
   check('actividad limpiada', get('activity').value === '', get('activity').value);
+  check('recurrente se reinicia al guardar', get('recurringSelect').value === '', get('recurringSelect').value);
   check('sin error en formulario', get('formError').classList.contains('hidden'), get('formError').textContent);
 
   // 5) Validaciones del formulario.

@@ -96,16 +96,24 @@
           <div class="lg:col-span-2">
             <form id="timeForm" class="card p-5 sm:p-6" novalidate autocomplete="off">
 
-              <!-- Proyecto -->
+              <!-- Proyecto + atajo de actividades recurrentes -->
               <div class="relative">
                 <label class="label" for="projectInput">Proyecto <span class="text-rose-500">*</span></label>
-                <div class="relative">
-                  <input id="projectInput" type="text" class="input pr-9"
-                         placeholder="Escribe el número o el nombre del proyecto…"
-                         role="combobox" aria-expanded="false" aria-controls="projectList" aria-autocomplete="list">
-                  <button id="projectClear" type="button" aria-label="Limpiar proyecto"
-                          class="absolute inset-y-0 right-0 hidden px-3 text-lg leading-none text-slate-400 hover:text-slate-700">×</button>
-                  <ul id="projectList" class="combo-list hidden" role="listbox"></ul>
+                <div class="flex flex-col gap-2 sm:flex-row">
+                  <div class="relative min-w-0 sm:flex-1">
+                    <input id="projectInput" type="text" class="input pr-9"
+                           placeholder="Escribe el número o el nombre del proyecto…"
+                           role="combobox" aria-expanded="false" aria-controls="projectList" aria-autocomplete="list">
+                    <button id="projectClear" type="button" aria-label="Limpiar proyecto"
+                            class="absolute inset-y-0 right-0 hidden px-3 text-lg leading-none text-slate-400 hover:text-slate-700">×</button>
+                    <ul id="projectList" class="combo-list hidden" role="listbox"></ul>
+                  </div>
+                  <div class="shrink-0 sm:w-56">
+                    <select id="recurringSelect" class="input" aria-label="Actividades recurrentes"
+                            title="Carga el proyecto, el tipo de actividad y la actividad de una fila de la pestaña Recurrentes">
+                      <option value="">⚡ Recurrente…</option>
+                    </select>
+                  </div>
                 </div>
                 <p id="projectHint" class="hint">Escribe y elige una opción de la lista.</p>
               </div>

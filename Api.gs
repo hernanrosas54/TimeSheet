@@ -120,6 +120,46 @@ function getActivityTypes_(force) {
   return list;
 }
 
+/**
+ * Actividades recurrentes de la hoja "Recurrentes".
+ * Columnas: A nombre, B número de proyecto, D tipo de actividad y E actividad
+ * (la columna C se ignora). La hoja la mantiene el usuario a mano, por eso se
+ * lee en cada arranque en lugar de guardarse en la caché de catálogos.
+ */
+function getRecurringEntries_() {
+  var sheet = getSpreadsheet_().getSheetByName(CONFIG.SHEETS.RECURRENTES);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+
+  var projectNames = {};
+  getProjects_().forEach(function (project) {
+    projectNames[normalizeText_(project.numero)] = project.nombre;
+  });
+
+  var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).getValues();
+  var list = [];
+
+  values.forEach(function (row) {
+    var nombre = String(row[0] == null ? '' : row[0]).trim();
+    if (!nombre) return;
+
+    var proyecto = String(row[1] == null ? '' : row[1]).trim();
+
+    list.push({
+      nombre: nombre,
+      proyecto: proyecto,
+      proyectoNombre: projectNames[normalizeText_(proyecto)] || '',
+      tipoActividad: String(row[3] == null ? '' : row[3]).trim(),
+      actividad: String(row[4] == null ? '' : row[4]).trim()
+    });
+  });
+
+  list.sort(function (a, b) {
+    return naturalCompare_(a.nombre, b.nombre);
+  });
+
+  return list;
+}
+
 /** Última hora de finalización registrada por el usuario. */
 function getLastEndTime_(codigo) {
   var code = String(codigo || '').toUpperCase();
@@ -192,6 +232,7 @@ function apiBootstrap() {
       payload.clients = getClients_();
       payload.projects = getProjects_();
       payload.activityTypes = getActivityTypes_();
+      payload.recurrentes = getRecurringEntries_();
       payload.users = listUsers_().map(function (user) {
         return { codigo: user.codigo, nombre: user.nombre };
       });

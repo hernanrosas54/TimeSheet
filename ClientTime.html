@@ -45,6 +45,32 @@ window.TimePage = (function () {
     });
   }
 
+  /** Actividades recurrentes leídas de la pestaña Recurrentes. */
+  function recurringItems() {
+    return Core.state.recurrentes || [];
+  }
+
+  /**
+   * Llena el desplegable de atajos con las filas de la pestaña Recurrentes:
+   * A nombre, B número de proyecto, D tipo de actividad y E actividad.
+   */
+  function renderRecurringOptions() {
+    const select = el('recurringSelect');
+    if (!select) return;
+
+    const list = recurringItems();
+    const previous = select.value;
+
+    select.innerHTML = '<option value="">⚡ Recurrente…</option>' + list.map(function (item, index) {
+      const label = item.proyecto ? item.nombre + ' · ' + item.proyecto : item.nombre;
+      return '<option value="' + index + '">' + Core.escapeHtml(label) + '</option>';
+    }).join('');
+
+    select.disabled = !list.length;
+    // Se conserva la opción elegida si la lista se recargó sin cambios.
+    select.value = previous && list[Number(previous)] ? previous : '';
+  }
+
   /* ------------------------------------------------------------ Arranque */
   function init() {
     if (state.bound) return;
@@ -95,6 +121,15 @@ window.TimePage = (function () {
     el('btnReset').addEventListener('click', function () {
       resetForm(true);
     });
+
+    // Atajo de carga: elegir una fila de la pestaña Recurrentes rellena el
+    // proyecto, el tipo de actividad y la actividad de una sola vez.
+    const recurring = el('recurringSelect');
+    if (recurring) {
+      recurring.addEventListener('change', function () {
+        applyRecurring(recurring.value);
+      });
+    }
 
     el('timeForm').addEventListener('submit', function (event) {
       event.preventDefault();
@@ -161,6 +196,7 @@ window.TimePage = (function () {
   function refresh() {
     state.projectCombo.setItems(projectItems());
     state.typeCombo.setItems(typeItems());
+    renderRecurringOptions();
 
     const tipos = Core.state.activityTypes || [];
     el('typeHint').textContent = tipos.length
@@ -213,6 +249,70 @@ window.TimePage = (function () {
     hint.textContent = parts.join(' · ');
     hint.className = selected.activo ? 'hint' : 'hint text-amber-600';
     clearButton.classList.remove('hidden');
+  }
+
+  /* ------------------------------------------------------------ Recurrentes */
+  /**
+   * Carga en el formulario el proyecto, el tipo de actividad y la actividad de
+   * una actividad recurrente. Igual que el botón «Copiar», no toca la fecha ni
+   * las horas: se conservan las que ya hubiera en el formulario.
+   */
+  function applyRecurring(index) {
+    const item = recurringItems()[Number(index)];
+    if (!item) return;
+
+    // Cargar un atajo siempre prepara un registro nuevo: se abandona la edición.
+    clearEditing();
+
+    const project = item.proyecto ? state.projectCombo.setSelectedByValue(item.proyecto) : null;
+    if (project) {
+      el('projectInput').classList.remove('is-invalid');
+      state.project = project.value;
+    } else if (item.proyecto) {
+      // El proyecto de la hoja ya no existe: se deja visible y marcado para no
+      // guardar por error con otro proyecto.
+      el('projectInput').value = item.proyecto;
+      el('projectInput').classList.add('is-invalid');
+      state.project = null;
+    } else {
+      state.projectCombo.clear();
+      state.project = null;
+      el('projectInput').classList.remove('is-invalid');
+    }
+    renderProjectHint();
+
+    const tipo = item.tipoActividad ? state.typeCombo.setSelectedByValue(item.tipoActividad) : null;
+    if (tipo) {
+      el('typeInput').classList.remove('is-invalid');
+      state.tipo = tipo.value;
+    } else if (item.tipoActividad) {
+      el('typeInput').value = item.tipoActividad;
+      el('typeInput').classList.add('is-invalid');
+      state.tipo = '';
+    } else {
+      state.typeCombo.clear();
+      state.tipo = '';
+      el('typeInput').classList.remove('is-invalid');
+    }
+
+    el('activity').value = item.actividad || '';
+    el('activity').classList.remove('is-invalid');
+
+    updatePreview();
+
+    const proyectoOk = !!project || !item.proyecto;
+    const tipoOk = !!tipo || !item.tipoActividad;
+
+    if (proyectoOk && tipoOk) {
+      Core.toast('Cargado: ' + item.nombre, 'success');
+      // Si la fila no trae actividad, el foco va ahí; si ya viene, a la hora fin.
+      (item.actividad ? el('endTime') : el('activity')).focus();
+      return;
+    }
+
+    Core.toast('Cargado, pero ' + (!proyectoOk ? 'el proyecto' : 'el tipo de actividad') +
+      ' ya no está en la lista. Elige uno válido antes de guardar.', 'error', 6000);
+    el(!proyectoOk ? 'projectInput' : 'typeInput').focus();
   }
 
   /* ------------------------------------------------------------ Resumen del día */
@@ -555,6 +655,10 @@ window.TimePage = (function () {
       el('notes').value = '';
       el('entryDate').value = saved.fecha;
 
+      // El atajo ya se aplicó: el desplegable vuelve a su opción vacía.
+      const recurring = el('recurringSelect');
+      if (recurring) recurring.value = '';
+
       if (result.dayEntries) {
         state.day = result.dayEntries;
         renderDay(result.dayEntries);
@@ -582,6 +686,8 @@ window.TimePage = (function () {
     state.project = null;
     state.typeCombo.clear();
     state.tipo = '';
+    const recurring = el('recurringSelect');
+    if (recurring) recurring.value = '';
     el('activity').value = '';
     el('notes').value = '';
     el('activity').classList.remove('is-invalid');

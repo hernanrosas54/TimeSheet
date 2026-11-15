@@ -39,7 +39,10 @@ var CONFIG = {
     PROYECTOS: 'Proyectos',
     TIEMPOS: 'Tiempos',
     USUARIOS: 'Usuarios',
-    TIPOS: 'TiposActividad'
+    TIPOS: 'TiposActividad',
+    // Hoja de solo lectura con atajos de carga:
+    // A nombre, B número de proyecto, D tipo de actividad, E actividad.
+    RECURRENTES: 'Recurrentes'
   }
 };
 
