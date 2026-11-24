@@ -169,13 +169,29 @@ const { context, get, calls, check, failures, tick } = env;
   get('endTime').dispatch('change');
   check('preview de duracion', /1 h 35 min/.test(get('durationPreview').textContent), get('durationPreview').textContent);
 
-  // 3b) Boton "Ahora" junto a la hora de inicio (redondeada al paso de 10 min).
+  // 3b) Boton "Ahora": fecha de hoy y hora de inicio redondeada al paso de 10 min.
   const expectedNow = env.evalIn('Core.currentRoundedTime(10)');
+  const today = env.evalIn('Core.todayIso()');
+  // Se parte de una fecha distinta a la de hoy para comprobar la recarga del panel.
+  const otherDay = today === '2026-11-03' ? '2026-11-04' : '2026-11-03';
+  get('entryDate').value = otherDay;
   get('startTime').value = '';
+  const beforeNow = calls.length;
   get('btnStartNow').dispatch('click');
+  await tick(60);
   check('boton Ahora rellena la hora de inicio', get('startTime').value === expectedNow, get('startTime').value + ' != ' + expectedNow);
   check('hora del boton redondeada a 10 min', /^([01]\d|2[0-3]):[0-5]0$/.test(get('startTime').value), get('startTime').value);
+  check('boton Ahora pone la fecha de hoy', get('entryDate').value === today, get('entryDate').value + ' != ' + today);
+  check('boton Ahora oculta el aviso de fecha distinta', get('dateWarning').classList.contains('hidden'),
+    get('dateWarning').classList.value);
+  check('boton Ahora recarga el panel del dia de hoy',
+    calls.slice(beforeNow).some((c) => c[0] === 'apiDayEntries' && c[1][0] === today),
+    JSON.stringify(calls.slice(beforeNow).map((c) => c[0])));
   check('el boton Ahora no toca la hora de fin', get('endTime').value === '09:35', get('endTime').value);
+
+  // Se vuelve a la fecha de la fixture para el resto de las comprobaciones.
+  get('entryDate').value = '2026-11-04';
+  get('startTime').value = '09:00';
 
   // 4) Guardado correcto.
   const before = calls.length;

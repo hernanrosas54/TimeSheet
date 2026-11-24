@@ -23,9 +23,10 @@ Comprueba, entre otras cosas:
 - Atajo de actividades recurrentes: el desplegable junto al proyecto se llena con
   la hoja `Recurrentes` y rellena proyecto, tipo de actividad y actividad sin
   tocar la fecha ni las horas; se reinicia al guardar.
-- Botón **Ahora** junto a la hora de inicio (único botón de hora actual): rellena
-  la hora de inicio con la hora actual redondeada al paso configurado y deja
-  intacta la hora de finalización.
+- Botón **Ahora** junto a la hora de inicio (único botón de hora actual): pone la
+  fecha de hoy, rellena la hora de inicio con la hora actual redondeada al paso
+  configurado, recarga el panel del día cuando la fecha cambia y deja intacta la
+  hora de finalización.
 - Carga múltiple: seis líneas (hasta 20), fecha común, encadenado de la hora fin
   a la hora inicio siguiente, redondeo, resumen de líneas completas y guardado
   secuencial con `apiSaveTimeEntry`; se validan líneas incompletas, proyectos
@@ -41,5 +42,5 @@ Comprueba, entre otras cosas:
   100, incluido el aviso cuando un proyecto no tiene registros.
 - Listado de registros de tiempo con filtros y cambio de usuario.
 
-Salida esperada: `Todas las comprobaciones pasaron.` (143 comprobaciones) y código
+Salida esperada: `Todas las comprobaciones pasaron.` (146 comprobaciones) y código
 de salida 0.

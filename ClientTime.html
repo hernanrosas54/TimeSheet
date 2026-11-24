@@ -111,11 +111,22 @@ window.TimePage = (function () {
       el('projectInput').focus();
     });
 
+    // «Ahora» fija la fecha de hoy y la hora de inicio redondeada al paso
+    // configurado. La hora fin no se toca: se escribe al terminar.
     el('btnStartNow').addEventListener('click', function () {
       const now = Core.currentRoundedTime(roundStep());
+      const today = Core.todayIso();
+      const dateChanged = el('entryDate').value !== today;
+
       el('startTime').value = now;
       el('startTime').classList.remove('is-invalid');
+
+      el('entryDate').value = today;
+      el('entryDate').classList.remove('is-invalid');
+
       updatePreview();
+      // Si la fecha cambió, el panel de registros debe mostrar el día de hoy.
+      if (dateChanged) loadDay();
     });
 
     el('btnReset').addEventListener('click', function () {
